@@ -1,75 +1,61 @@
 package com.mina.minaportfoliomanagement.service;
 
+import com.mina.minaportfoliomanagement.client.MarketPriceApiClient;
 import com.mina.minaportfoliomanagement.dto.MarketAssetView;
+import com.mina.minaportfoliomanagement.dto.MarketQuote;
+import com.mina.minaportfoliomanagement.dto.PriceHistoryView;
+import com.mina.minaportfoliomanagement.model.AssetCatalog;
 import com.mina.minaportfoliomanagement.repository.AssetCatalogRepository;
 import com.mina.minaportfoliomanagement.repository.AssetPriceHistoryRepository;
+import jakarta.annotation.PostConstruct;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ThreadLocalRandom;
 
+/** 负责市场价格查询和培训 API 的定时同步。 */
 @Service
 public class MarketPriceService {
+
     private final AssetCatalogRepository assetCatalogRepository;
     private final AssetPriceHistoryRepository priceHistoryRepository;
+    private final MarketPriceApiClient marketPriceApiClient;
 
-    public MarketPriceService(AssetCatalogRepository assetCatalogRepository, AssetPriceHistoryRepository priceHistoryRepository) {
+    public MarketPriceService(AssetCatalogRepository assetCatalogRepository,
+                              AssetPriceHistoryRepository priceHistoryRepository,
+                              MarketPriceApiClient marketPriceApiClient) {
         this.assetCatalogRepository = assetCatalogRepository;
         this.priceHistoryRepository = priceHistoryRepository;
+        this.marketPriceApiClient = marketPriceApiClient;
     }
+
     public List<MarketAssetView> getMarketAssets() {
         return assetCatalogRepository.findAllWithLatestPrice();
     }
-    /**
-     * 为全部资产生成下一模拟交易日的价格。
-     */
-    public List<MarketAssetView> advanceToNextDay() {
-        List<MarketAssetView> currentAssets =
-                assetCatalogRepository.findAllWithLatestPrice();
 
-        LocalDate nextDate =
-                priceHistoryRepository.getLatestMarketDate().plusDays(1);
+    /** 返回某只股票所有已保存行情，供买入时选择时间点。 */
+    public List<PriceHistoryView> getPriceHistory(long assetCatalogId) {
+        return priceHistoryRepository.findAllByAssetId(assetCatalogId);
+    }
 
-        List<MarketAssetView> nextAssets = new ArrayList<>();
+    /** 首次启动立刻拉取价格，保证页面打开时已经有市场数据。 */
+    @PostConstruct
+    public void loadPricesOnStartup() {
+        refreshMarketPrices();
+    }
 
-        for (MarketAssetView asset : currentAssets) {
-            BigDecimal nextPrice = randomNextPrice(asset.getMarketPrice());
+    /** 培训 API 按天更新整段五分钟历史，因此每天早上同步一次即可。 */
+    @Scheduled(cron = "0 0 8 * * *")
+    public void refreshMarketPricesOnSchedule() {
+        refreshMarketPrices();
+    }
 
-            priceHistoryRepository.savePrice(
-                    asset.getId(),
-                    nextPrice,
-                    nextDate
-            );
-
-            nextAssets.add(new MarketAssetView(
-                    asset.getId(),
-                    asset.getTicker(),
-                    asset.getAssetName(),
-                    asset.getAssetType(),
-                    nextPrice,
-                    nextDate
-            ));
+    /** 拉取全部资产的完整价格历史，并保存为本地数据库的唯一数据来源。 */
+    public List<MarketAssetView> refreshMarketPrices() {
+        for (AssetCatalog asset : assetCatalogRepository.findAll()) {
+            List<MarketQuote> quotes = marketPriceApiClient.getPriceHistory(asset.getTicker());
+            priceHistoryRepository.savePrices(asset.getId(), quotes);
         }
-
-        return nextAssets;
+        return getMarketAssets();
     }
-
-    /**
-     * 价格随机浮动 -5% 到 +5%，最低不能小于 0.01。
-     */
-    private BigDecimal randomNextPrice(BigDecimal currentPrice) {
-        double change =
-                ThreadLocalRandom.current().nextDouble(-0.05, 0.0501);
-
-        BigDecimal nextPrice = currentPrice
-                .multiply(BigDecimal.valueOf(1 + change))
-                .setScale(2, RoundingMode.HALF_UP);
-
-        return nextPrice.max(new BigDecimal("0.01"));
-    }
-
 }

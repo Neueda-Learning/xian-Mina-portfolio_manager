@@ -1,11 +1,11 @@
 package com.mina.minaportfoliomanagement.dto;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 /**
  * 给市场页面返回的数据。
- * 它包含资产目录信息和当天最新市场价，
+ * 它包含资产目录信息和最新市场价，
  * 因此不是单独对应某一张数据库表的 Model。
  */
 public class MarketAssetView {
@@ -15,16 +15,16 @@ public class MarketAssetView {
     private final String assetName;
     private final String assetType;
     private final BigDecimal marketPrice;
-    private final LocalDate priceDate;
+    private final LocalDateTime priceTime;
 
     public MarketAssetView(Long id, String ticker, String assetName, String assetType,
-                           BigDecimal marketPrice, LocalDate priceDate) {
+                           BigDecimal marketPrice, LocalDateTime priceTime) {
         this.id = id;
         this.ticker = ticker;
         this.assetName = assetName;
         this.assetType = assetType;
         this.marketPrice = marketPrice;
-        this.priceDate = priceDate;
+        this.priceTime = priceTime;
     }
 
     public Long getId() {
@@ -47,7 +47,7 @@ public class MarketAssetView {
         return marketPrice;
     }
 
-    public LocalDate getPriceDate() {
-        return priceDate;
+    public LocalDateTime getPriceTime() {
+        return priceTime;
     }
 }
