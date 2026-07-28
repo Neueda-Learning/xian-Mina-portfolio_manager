@@ -1,0 +1,50 @@
+package com.mina.minaportfoliomanagement.model;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+
+public class TradeHistory {
+    private Long id;
+    private Long assetCatalogId;
+    private String tradeType;
+    private BigDecimal quantity;
+    private BigDecimal tradePrice;
+    private LocalDateTime tradeTime;
+
+    public TradeHistory() {
+    }
+
+    public TradeHistory(Long id, Long assetCatalogId, String tradeType, BigDecimal quantity, BigDecimal tradePrice, LocalDateTime tradeTime) {
+        this.id = id;
+        this.assetCatalogId = assetCatalogId;
+        this.tradeType = tradeType;
+        this.quantity = quantity;
+        this.tradePrice = tradePrice;
+        this.tradeTime = tradeTime;
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public Long getAssetCatalogId() {
+        return assetCatalogId;
+    }
+
+    public String getTradeType() {
+        return tradeType;
+    }
+
+    public BigDecimal getQuantity() {
+        return quantity;
+    }
+
+    public BigDecimal getTradePrice() {
+        return tradePrice;
+    }
+
+    public LocalDateTime getTradeTime() {
+        return tradeTime;
+    }
+
+}

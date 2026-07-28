@@ -9,18 +9,18 @@ public class PortfolioItem {
     private Long assetCatalogId;
     private BigDecimal quantity;
     private BigDecimal purchasePrice;
-    private LocalDate purchaseDate;
+    private LocalDateTime purchaseTime;
     private LocalDateTime createdAt;
 
     public PortfolioItem() {
     }
 
-    public PortfolioItem(Long id, Long assetCatalogId, BigDecimal quantity, BigDecimal purchasePrice, LocalDate purchaseDate, LocalDateTime createdAt) {
+    public PortfolioItem(Long id, Long assetCatalogId, BigDecimal quantity, BigDecimal purchasePrice, LocalDateTime purchaseTime, LocalDateTime createdAt) {
         this.id = id;
         this.assetCatalogId = assetCatalogId;
         this.quantity = quantity;
         this.purchasePrice = purchasePrice;
-        this.purchaseDate = purchaseDate;
+        this.purchaseTime = purchaseTime;
         this.createdAt = createdAt;
     }
 
@@ -48,12 +48,12 @@ public class PortfolioItem {
         this.purchasePrice = purchasePrice;
     }
 
-    public LocalDate getPurchaseDate() {
-        return purchaseDate;
+    public LocalDateTime getPurchaseTime() {
+        return purchaseTime;
     }
 
-    public void setPurchaseDate(LocalDate purchaseDate) {
-        this.purchaseDate = purchaseDate;
+    public void setPurchaseTime(LocalDateTime purchaseTime) {
+        this.purchaseTime = purchaseTime;
     }
 
     public LocalDateTime getCreatedAt() {
