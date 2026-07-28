@@ -2,7 +2,9 @@ package com.mina.minaportfoliomanagement.repository;
 
 import com.mina.minaportfoliomanagement.model.TradeHistory;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Repository;
 
+@Repository
 public class TradeHistoryRepository {
     private final JdbcTemplate jdbcTemplate;
 
