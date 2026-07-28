@@ -38,7 +38,7 @@ public class HoldingService {
 
     public List<HoldingView> getAllItems() {
         List<HoldingView> items = portfolioItemRepository.findAll();
-        //performanceService.recordCurrentPortfolioValue();
+        performanceService.recordCurrentPortfolioValue();
         return items;
     }
     public HoldingView getItem(long id){
@@ -91,7 +91,7 @@ public class HoldingService {
         tradeHistoryRepository.save(new TradeHistory(item.getAssetCatalogId(), "BUY", item.getQuantity(),
                 marketQuote.price(), marketQuote.priceTime()));
         HoldingView result = getItem(id);
-        //performanceService.recordCurrentPortfolioValue();
+        performanceService.recordCurrentPortfolioValue();
         return result;
     }
 
@@ -114,7 +114,7 @@ public class HoldingService {
         }
         tradeHistoryRepository.save(new TradeHistory(holding.getAssetCatalogId(), "SELL", request.getQuantity(),
                 marketAsset.getMarketPrice(), marketAsset.getPriceTime()));
-        //performanceService.recordCurrentPortfolioValue();
+        performanceService.recordCurrentPortfolioValue();
     }
 
     public void deleteItem(long id) {
