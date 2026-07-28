@@ -3,9 +3,11 @@ package com.mina.minaportfoliomanagement.controller;
 import com.mina.minaportfoliomanagement.dto.PortfolioSummary;
 import com.mina.minaportfoliomanagement.service.SummaryService;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
+@RequestMapping("/api/portfolio-items")
 public class SummaryController {
     private final SummaryService summaryService;
 

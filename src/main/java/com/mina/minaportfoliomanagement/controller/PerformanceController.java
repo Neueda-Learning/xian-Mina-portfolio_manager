@@ -3,11 +3,13 @@ package com.mina.minaportfoliomanagement.controller;
 import com.mina.minaportfoliomanagement.model.PortfolioValueHistory;
 import com.mina.minaportfoliomanagement.service.PerformanceService;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
 @RestController
+@RequestMapping("/api/portfolio-items")
 public class PerformanceController {
     private final PerformanceService performanceService;
 
