@@ -2,16 +2,17 @@ package com.mina.minaportfoliomanagement.model;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 public class PortfolioValueHistory {
     private Long id;
     private BigDecimal totalValue;
-    private LocalDate recordDate;
+    private LocalDateTime recordDate;
 
     public PortfolioValueHistory() {
     }
 
-    public PortfolioValueHistory(Long id, BigDecimal totalValue, LocalDate recordDate) {
+    public PortfolioValueHistory(Long id, BigDecimal totalValue, LocalDateTime recordDate) {
         this.id = id;
         this.totalValue = totalValue;
         this.recordDate = recordDate;
@@ -33,11 +34,10 @@ public class PortfolioValueHistory {
         this.totalValue = totalValue;
     }
 
-    public LocalDate getRecordDate() {
+    public LocalDateTime getRecordDate() {
         return recordDate;
     }
-
-    public void setRecordDate(LocalDate recordDate) {
+    public void setRecordDate(LocalDateTime recordDate) {
         this.recordDate = recordDate;
     }
 }
