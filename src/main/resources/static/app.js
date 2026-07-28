@@ -1,0 +1,376 @@
+const API_URL = "/api/portfolio-items";
+const TYPE_ORDER = ["STOCK", "BOND", "CRYPTO", "CASH"];
+const TYPE_META = {
+    STOCK: { label: "Stocks", color: "#1768d5" },
+    BOND: { label: "Bonds", color: "#028b78" },
+    CRYPTO: { label: "Crypto", color: "#dc4b58" },
+    CASH: { label: "Cash", color: "#eeb547" }
+};
+const state = { items: [], performance: [], marketAssets: [], selectedId: null };
+const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
+
+const dialog = document.querySelector("#assetDialog");
+const aiDialog = document.querySelector("#aiAnalysisDialog");
+const toast = document.querySelector("#toast");
+let toastTimer;
+let activeAiSource = null;
+
+// 从后端读取真实持仓、市场价格和组合价值历史；页面只负责显示和计算。
+async function loadItems() {
+    try {
+        const [itemsResponse, performanceResponse, marketResponse] = await Promise.all([
+            fetch(API_URL), fetch(`${API_URL}/performance`), fetch(`${API_URL}/market/assets`)
+        ]);
+        if (!itemsResponse.ok || !performanceResponse.ok || !marketResponse.ok) throw new Error("Unable to load holdings");
+        state.items = await itemsResponse.json();
+        state.performance = await performanceResponse.json();
+        state.marketAssets = await marketResponse.json();
+        renderDashboard();
+    } catch (error) {
+        showToast("Could not reach the API. Please check Spring Boot is running.");
+    }
+}
+
+function decorateItem(item) {
+    const quantity = Number(item.quantity);
+    const price = Number(item.purchasePrice);
+    // currentPrice 由后端从 asset_price_history 最新记录返回。
+    const currentPrice = Number(item.currentPrice ?? item.purchasePrice);
+    const costBasis = quantity * price;
+    const marketValue = quantity * currentPrice;
+    return { ...item, quantity, price, currentPrice, costBasis, marketValue, profitLoss: marketValue - costBasis };
+}
+
+function getDashboardData() {
+    const items = state.items.map(decorateItem);
+    const totalCost = items.reduce((sum, item) => sum + item.costBasis, 0);
+    const totalValue = items.reduce((sum, item) => sum + item.marketValue, 0);
+    const totalReturn = totalValue - totalCost;
+    const allocations = TYPE_ORDER.map(type => {
+        const value = items.filter(item => item.assetType === type).reduce((sum, item) => sum + item.marketValue, 0);
+        return { type, value, percentage: totalValue ? value / totalValue * 100 : 0 };
+    });
+    return { items, totalCost, totalValue, totalReturn, returnPercent: totalCost ? totalReturn / totalCost * 100 : 0, allocations };
+}
+
+function renderDashboard() {
+    const data = getDashboardData();
+    document.querySelector("#totalValue").textContent = money.format(data.totalValue);
+    document.querySelector("#totalCost").textContent = money.format(data.totalCost);
+    document.querySelector("#totalReturn").textContent = `${data.totalReturn >= 0 ? "+" : ""}${money.format(data.totalReturn)}`;
+    document.querySelector("#totalReturn").className = data.totalReturn >= 0 ? "profit" : "loss";
+    document.querySelector("#returnPercent").textContent = `${data.returnPercent >= 0 ? "+" : ""}${data.returnPercent.toFixed(2)}% estimated return`;
+    document.querySelector("#holdingCount").textContent = `${data.items.length} holding${data.items.length === 1 ? "" : "s"}`;
+    document.querySelector("#performanceReturn").textContent = `${data.returnPercent >= 0 ? "+" : ""}${data.returnPercent.toFixed(2)}%`;
+    document.querySelector("#donutTotal").textContent = compactMoney(data.totalValue);
+    renderAllocation(data.allocations);
+    renderHoldings(data.items);
+    renderValueCards(data.allocations);
+    drawPerformanceChart(data);
+    renderMarketAssets();
+}
+
+function renderAllocation(allocations) {
+    const donut = document.querySelector("#allocationDonut");
+    const legend = document.querySelector("#allocationLegend");
+    let current = 0;
+    const segments = allocations.filter(item => item.value > 0).map(item => {
+        const start = current;
+        current += item.percentage;
+        return `${TYPE_META[item.type].color} ${start}% ${current}%`;
+    });
+    donut.style.background = segments.length ? `conic-gradient(${segments.join(",")})` : "#e9edf3";
+    legend.innerHTML = allocations.map(item => `
+        <div class="legend-row">
+            <i class="legend-dot" style="background:${TYPE_META[item.type].color}"></i>
+            <span>${TYPE_META[item.type].label}</span>
+            <strong>${item.percentage.toFixed(0)}%</strong>
+        </div>`).join("");
+}
+
+function renderHoldings(items) {
+    const body = document.querySelector("#holdingsBody");
+    const empty = document.querySelector("#emptyState");
+    body.innerHTML = items.map(item => `
+        <tr class="${item.id === state.selectedId ? "selected" : ""}" data-id="${item.id}">
+            <td><input class="holding-select" type="radio" name="selectedHolding" value="${item.id}"
+                aria-label="Select ${escapeHtml(item.ticker)} holding" ${item.id === state.selectedId ? "checked" : ""}></td>
+            <td><span class="symbol">${escapeHtml(item.ticker)}</span><br><small>${escapeHtml(item.assetName || "Investment asset")}</small></td>
+            <td>${TYPE_META[item.assetType]?.label || item.assetType}</td>
+            <td class="number">${item.quantity}</td>
+            <td class="number">${money.format(item.currentPrice)}</td>
+            <td class="number">${money.format(item.price)}</td>
+            <td class="number">${money.format(item.marketValue)}</td>
+            <td class="number ${item.profitLoss >= 0 ? "profit" : "loss"}">${item.profitLoss >= 0 ? "+" : ""}${money.format(item.profitLoss)}</td>
+            <td><button class="remove-row" data-sell-id="${item.id}">Sell</button></td>
+        </tr>`).join("");
+    empty.hidden = items.length !== 0;
+    body.querySelectorAll("tr").forEach(row => row.addEventListener("click", () => {
+        state.selectedId = Number(row.dataset.id);
+        renderDashboard();
+    }));
+    // 单选框让“已选择哪一笔持仓”更直观；点击单选框不触发表格行的重复事件。
+    body.querySelectorAll("[name=selectedHolding]").forEach(input => input.addEventListener("click", event => {
+        event.stopPropagation();
+        state.selectedId = Number(input.value);
+        renderDashboard();
+    }));
+    body.querySelectorAll("[data-sell-id]").forEach(button => button.addEventListener("click", event => {
+        event.stopPropagation();
+        sellItem(Number(button.dataset.sellId));
+    }));
+}
+
+function renderValueCards(allocations) {
+    document.querySelector("#assetValueCards").innerHTML = allocations.map(item => `
+        <article class="value-card" style="--card-color:${TYPE_META[item.type].color}">
+            <span>${TYPE_META[item.type].label} Value</span>
+            <strong>${money.format(item.value)}</strong>
+        </article>`).join("");
+}
+
+function renderMarketAssets() {
+    const body = document.querySelector("#marketBody");
+    const select = document.querySelector("#assetCatalogId");
+    body.innerHTML = state.marketAssets.map(asset => `
+        <tr><td class="symbol">${escapeHtml(asset.ticker)}</td><td>${escapeHtml(asset.assetName)}</td>
+        <td>${TYPE_META[asset.assetType]?.label || asset.assetType}</td>
+        <td class="number">${money.format(Number(asset.marketPrice))}</td><td>${asset.priceTime}</td></tr>`).join("");
+    select.innerHTML = state.marketAssets.map(asset =>
+        `<option value="${asset.id}">${escapeHtml(asset.ticker)} — ${escapeHtml(asset.assetName)}</option>`).join("");
+    const marketDay = state.marketAssets[0]?.priceTime || "—";
+    document.querySelector("#marketDay").textContent = marketDay;
+    loadPriceOptions();
+}
+
+// 根据当前选中的股票读取全部五分钟历史价格，供用户选择买入时点。
+async function loadPriceOptions() {
+    const assetId = Number(document.querySelector("#assetCatalogId").value);
+    const priceTimeSelect = document.querySelector("#priceTime");
+    if (!assetId) {
+        priceTimeSelect.innerHTML = "";
+        updateSelectedMarketPrice();
+        return;
+    }
+    try {
+        const response = await fetch(`${API_URL}/market/assets/${assetId}/prices`);
+        if (!response.ok) throw new Error("Unable to load price history");
+        const prices = await response.json();
+        priceTimeSelect.innerHTML = prices.map(item => {
+            const time = item.priceTime.replace("T", " ");
+            return `<option value="${item.priceTime}" data-price="${item.marketPrice}">${time}</option>`;
+        }).join("");
+        updateSelectedMarketPrice();
+    } catch (error) {
+        priceTimeSelect.innerHTML = "";
+        showToast("Could not load the selected asset price history.");
+        updateSelectedMarketPrice();
+    }
+}
+
+function updateSelectedMarketPrice() {
+    const option = document.querySelector("#priceTime").selectedOptions[0];
+    document.querySelector("#selectedMarketPrice").textContent = option
+        ? money.format(Number(option.dataset.price)) : "—";
+}
+
+// 折线图读取 portfolio_value_history；暂无两天以上历史时显示当天的平线。
+function drawPerformanceChart(data) {
+    const canvas = document.querySelector("#performanceChart");
+    const box = canvas.getBoundingClientRect();
+    const ratio = window.devicePixelRatio || 1;
+    canvas.width = box.width * ratio;
+    canvas.height = box.height * ratio;
+    const ctx = canvas.getContext("2d");
+    ctx.scale(ratio, ratio);
+    const width = box.width;
+    const height = box.height;
+    const storedHistory = state.performance.map(item => Number(item.totalValue));
+    const history = storedHistory.length >= 2 ? storedHistory : [data.totalValue || 0, data.totalValue || 0];
+    const min = Math.min(...history) * .97;
+    const max = Math.max(...history) * 1.03;
+    const padding = { top: 13, right: 10, bottom: 10, left: 45 };
+    const chartWidth = width - padding.left - padding.right;
+    const chartHeight = height - padding.top - padding.bottom;
+    const point = (item, index) => ({ x: padding.left + chartWidth * index / (history.length - 1), y: padding.top + (max - item) / (max - min || 1) * chartHeight });
+
+    ctx.clearRect(0, 0, width, height);
+    ctx.font = "11px Segoe UI";
+    ctx.fillStyle = "#8795a9";
+    ctx.strokeStyle = "#e8edf5";
+    for (let line = 0; line < 4; line++) {
+        const y = padding.top + chartHeight * line / 3;
+        ctx.beginPath(); ctx.moveTo(padding.left, y); ctx.lineTo(width - padding.right, y); ctx.stroke();
+        ctx.fillText(compactMoney(max - (max - min) * line / 3), 2, y + 4);
+    }
+    const gradient = ctx.createLinearGradient(0, padding.top, 0, height);
+    gradient.addColorStop(0, "rgba(23, 104, 213, .28)");
+    gradient.addColorStop(1, "rgba(23, 104, 213, .01)");
+    ctx.beginPath();
+    history.forEach((item, index) => { const p = point(item, index); index ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y); });
+    const last = point(history.at(-1), history.length - 1);
+    ctx.lineTo(last.x, height - padding.bottom); ctx.lineTo(padding.left, height - padding.bottom); ctx.closePath();
+    ctx.fillStyle = gradient; ctx.fill();
+    ctx.beginPath();
+    history.forEach((item, index) => { const p = point(item, index); index ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y); });
+    ctx.strokeStyle = "#1768d5"; ctx.lineWidth = 3; ctx.stroke();
+}
+
+async function saveAsset(event) {
+    event.preventDefault();
+    const payload = {
+        assetCatalogId: Number(document.querySelector("#assetCatalogId").value),
+        quantity: Number(document.querySelector("#quantity").value),
+        priceTime: document.querySelector("#priceTime").value
+    };
+    const response = await fetch(API_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+    if (!response.ok) { showToast("Could not save asset. Please check the values."); return; }
+    dialog.close();
+    event.target.reset();
+    showToast("Asset purchased at the latest market price.");
+    loadItems();
+}
+
+async function sellItem(id) {
+    const holding = state.items.find(item => item.id === id);
+    if (!holding) return;
+    const input = window.prompt(`Sell quantity (maximum: ${holding.quantity})`, holding.quantity);
+    if (input === null) return;
+    const quantity = Number(input);
+    if (!Number.isFinite(quantity) || quantity <= 0 || quantity > Number(holding.quantity)) {
+        showToast("Enter a valid sell quantity.");
+        return;
+    }
+    const response = await fetch(`${API_URL}/${id}/sell`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ quantity })
+    });
+    if (!response.ok) { showToast("Could not sell the asset."); return; }
+    if (state.selectedId === id) state.selectedId = null;
+    showToast("Asset sold at the latest market price.");
+    loadItems();
+}
+
+let aiAnalysisText = "";
+
+// 将模型的固定 Markdown 标题转换为报告卡片，避免直接显示 ## 和原始换行。
+function renderAiAnalysis() {
+    const output = document.querySelector("#aiAnalysisOutput");
+    const text = aiAnalysisText.replace(/\r/g, "").trim();
+    if (!text) {
+        output.innerHTML = '<div class="ai-empty-state"><strong>正在生成分析</strong><span>DeepSeek 正在整理当前持仓和市场行情…</span></div>';
+        return;
+    }
+
+    // 某些模型会返回“##持仓分析”（没有空格），两种写法都要识别。
+    const sections = text.split(/(?=^##\s*)/m).filter(section => section.trim());
+    const report = sections.map((section, index) => {
+        const lines = section.trim().split("\n");
+        const title = lines.shift().replace(/^##\s*/, "").trim() || "分析内容";
+        const content = lines.filter(line => line.trim());
+        const bullets = content.filter(line => /^[-*]\s+/.test(line));
+        const paragraphs = content.filter(line => !/^[-*]\s+/.test(line));
+        const body = [
+            paragraphs.map(line => `<p>${formatAiText(line)}</p>`).join(""),
+            bullets.length ? `<ul>${bullets.map(line => `<li>${formatAiText(line.replace(/^[-*]\s+/, ""))}</li>`).join("")}</ul>` : ""
+        ].join("");
+        return `<article class="ai-report-section"><div class="ai-section-heading"><span class="ai-section-index">${String(index + 1).padStart(2, "0")}</span><h3>${escapeHtml(title)}</h3></div><div class="ai-section-content">${body || '<p>正在生成内容…</p>'}</div></article>`;
+    });
+    output.innerHTML = `<div class="ai-report-grid">${report.join("")}</div>`;
+}
+
+// 仅保留粗体标记；其他内容先转义，避免模型返回内容被当成 HTML 执行。
+function formatAiText(text) {
+    return escapeHtml(text).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+}
+
+function setAiStatus(text, state = "") {
+    const status = document.querySelector("#aiAnalysisStatus");
+    status.className = `ai-status${state ? ` is-${state}` : ""}`;
+    status.innerHTML = `<i></i>${escapeHtml(text)}`;
+}
+
+// EventSource 会持续接收后端转发的 DeepSeek token，不需要等待整段分析生成完毕。
+function startAiAnalysis() {
+    const button = document.querySelector("#startAiAnalysisButton");
+    if (activeAiSource) activeAiSource.close();
+    aiDialog.showModal();
+    button.disabled = true;
+    aiAnalysisText = "";
+    setAiStatus("Generating analysis…", "loading");
+    renderAiAnalysis();
+
+    const source = new EventSource("/api/ai-analysis/stream");
+    activeAiSource = source;
+    source.addEventListener("token", event => {
+        aiAnalysisText += event.data;
+        renderAiAnalysis();
+    });
+    source.addEventListener("complete", () => {
+        source.close();
+        activeAiSource = null;
+        button.disabled = false;
+        setAiStatus("Analysis complete");
+    });
+    source.addEventListener("ai-error", event => {
+        aiAnalysisText = `## 分析失败\n- ${event.data}`;
+        renderAiAnalysis();
+        source.close();
+        activeAiSource = null;
+        button.disabled = false;
+        setAiStatus("Unable to analyze", "error");
+    });
+    source.onerror = () => {
+        if (source.readyState !== EventSource.CLOSED) {
+            aiAnalysisText = "## 连接中断\n- AI 连接中断，请稍后重试。";
+            renderAiAnalysis();
+            source.close();
+            activeAiSource = null;
+            button.disabled = false;
+            setAiStatus("Connection interrupted", "error");
+        }
+    };
+}
+
+function compactMoney(value) {
+    return value >= 1000 ? `$${(value / 1000).toFixed(value >= 100000 ? 0 : 1)}k` : money.format(value);
+}
+function escapeHtml(value) { return String(value).replace(/[&<>'"]/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[char]); }
+function showToast(message) { clearTimeout(toastTimer); toast.textContent = message; toast.classList.add("show"); toastTimer = setTimeout(() => toast.classList.remove("show"), 2600); }
+
+document.querySelector("#openAddDialogButton").addEventListener("click", () => dialog.showModal());
+document.querySelector("#emptyAddButton").addEventListener("click", () => dialog.showModal());
+document.querySelector("#closeDialogButton").addEventListener("click", () => dialog.close());
+document.querySelector("#cancelDialogButton").addEventListener("click", () => dialog.close());
+document.querySelector("#closeAiDialogButton").addEventListener("click", () => {
+    if (activeAiSource) activeAiSource.close();
+    activeAiSource = null;
+    document.querySelector("#startAiAnalysisButton").disabled = false;
+    setAiStatus("Analysis closed");
+    aiDialog.close();
+});
+// 用户按 Esc 关闭弹窗时，也停止仍在进行的流式连接。
+aiDialog.addEventListener("close", () => {
+    if (!activeAiSource) return;
+    activeAiSource.close();
+    activeAiSource = null;
+    document.querySelector("#startAiAnalysisButton").disabled = false;
+    setAiStatus("Analysis closed");
+});
+document.querySelector("#assetForm").addEventListener("submit", saveAsset);
+document.querySelector("#assetCatalogId").addEventListener("change", loadPriceOptions);
+document.querySelector("#priceTime").addEventListener("change", updateSelectedMarketPrice);
+document.querySelector("#removeSelectedButton").addEventListener("click", () => state.selectedId ? sellItem(state.selectedId) : showToast("Select a holding row first."));
+document.querySelector("#startAiAnalysisButton").addEventListener("click", startAiAnalysis);
+document.querySelectorAll("[data-scroll-target]").forEach(button => button.addEventListener("click", () => {
+    const target = document.querySelector(`#${button.dataset.scrollTarget}`);
+    if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+    document.querySelectorAll(".nav-item").forEach(item => item.classList.remove("active"));
+    button.classList.add("active");
+}));
+document.querySelectorAll("[data-toast]").forEach(button => button.addEventListener("click", () => showToast(button.dataset.toast)));
+window.addEventListener("resize", renderDashboard);
+loadItems();
+// 前端每分钟只读一次本项目后端；价格 API 的五分钟同步由后端定时任务负责。
+setInterval(loadItems, 60_000);
