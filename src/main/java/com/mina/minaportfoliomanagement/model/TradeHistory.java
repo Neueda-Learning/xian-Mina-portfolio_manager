@@ -4,7 +4,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 public class TradeHistory {
-    private Long id;
+
     private Long assetCatalogId;
     private String tradeType;
     private BigDecimal quantity;
@@ -14,17 +14,12 @@ public class TradeHistory {
     public TradeHistory() {
     }
 
-    public TradeHistory(Long id, Long assetCatalogId, String tradeType, BigDecimal quantity, BigDecimal tradePrice, LocalDateTime tradeTime) {
-        this.id = id;
+    public TradeHistory(Long assetCatalogId, String tradeType, BigDecimal quantity, BigDecimal tradePrice, LocalDateTime tradeTime) {
         this.assetCatalogId = assetCatalogId;
         this.tradeType = tradeType;
         this.quantity = quantity;
         this.tradePrice = tradePrice;
         this.tradeTime = tradeTime;
-    }
-
-    public Long getId() {
-        return id;
     }
 
     public Long getAssetCatalogId() {
