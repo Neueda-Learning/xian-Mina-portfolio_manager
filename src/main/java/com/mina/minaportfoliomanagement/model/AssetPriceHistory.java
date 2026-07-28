@@ -1,20 +1,21 @@
 package com.mina.minaportfoliomanagement.model;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
-/** 对应 MySQL 的 asset_price_history 表，保存可购买资产某一天的市场价格。 */
+import java.time.LocalDateTime;
+
+/** 对应 MySQL 的 asset_price_history 表，保存可购买资产每五分钟的市场价格。 */
 public class AssetPriceHistory {
     private Long id;
     private Long assetCatalogId;
     private BigDecimal marketPrice;
-    private LocalDate priceDate;
+    private LocalDateTime priceTime;
 
     public AssetPriceHistory() {
     }
 
-    public AssetPriceHistory(Long id, LocalDate priceDate, BigDecimal marketPrice, Long assetCatalogId) {
+    public AssetPriceHistory(Long id, LocalDateTime priceTime, BigDecimal marketPrice, Long assetCatalogId) {
         this.id = id;
-        this.priceDate = priceDate;
+        this.priceTime = priceTime;
         this.marketPrice = marketPrice;
         this.assetCatalogId = assetCatalogId;
     }
@@ -43,11 +44,11 @@ public class AssetPriceHistory {
         this.marketPrice = marketPrice;
     }
 
-    public LocalDate getPriceDate() {
-        return priceDate;
+    public LocalDateTime getPriceTime() {
+        return priceTime;
     }
 
-    public void setPriceDate(LocalDate priceDate) {
-        this.priceDate = priceDate;
+    public void setPriceTime(LocalDateTime priceTime) {
+        this.priceTime = priceTime;
     }
 }
