@@ -1,6 +1,6 @@
-package org.lk.portfoliomanagement.controller;
+package com.mina.minaportfoliomanagement.controller;
 
-import org.lk.portfoliomanagement.service.AiAnalysisService;
+import com.mina.minaportfoliomanagement.service.AiAnalysisService;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
