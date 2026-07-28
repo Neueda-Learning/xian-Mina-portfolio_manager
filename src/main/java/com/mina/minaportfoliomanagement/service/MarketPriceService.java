@@ -20,13 +20,16 @@ public class MarketPriceService {
     private final AssetCatalogRepository assetCatalogRepository;
     private final AssetPriceHistoryRepository priceHistoryRepository;
     private final MarketPriceApiClient marketPriceApiClient;
+    private final PerformanceService performanceService;
 
     public MarketPriceService(AssetCatalogRepository assetCatalogRepository,
                               AssetPriceHistoryRepository priceHistoryRepository,
-                              MarketPriceApiClient marketPriceApiClient) {
+                              MarketPriceApiClient marketPriceApiClient,
+                              PerformanceService performanceService) {
         this.assetCatalogRepository = assetCatalogRepository;
         this.priceHistoryRepository = priceHistoryRepository;
         this.marketPriceApiClient = marketPriceApiClient;
+        this.performanceService = performanceService;
     }
 
     public List<MarketAssetView> getMarketAssets() {
@@ -56,6 +59,8 @@ public class MarketPriceService {
             List<MarketQuote> quotes = marketPriceApiClient.getPriceHistory(asset.getTicker());
             priceHistoryRepository.savePrices(asset.getId(), quotes);
         }
+        // 全部最新行情写入后，用同一个市场时间保存一次组合总市值。
+        performanceService.recordCurrentPortfolioValue();
         return getMarketAssets();
     }
 }
