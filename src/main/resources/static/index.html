@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portfolio Manager</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app-shell">
+    <aside class="sidebar">
+        <div class="brand">
+            <span class="brand-mark">PM</span>
+            <span>Portfolio<br>Manager</span>
+        </div>
+
+        <nav class="nav-menu" aria-label="主导航">
+            <button class="nav-item active" data-scroll-target="dashboard"><span>▦</span>Dashboard</button>
+            <button class="nav-item" data-scroll-target="market"><span>◈</span>Market Prices</button>
+            <button class="nav-item" data-scroll-target="holdings"><span>▤</span>Holdings</button>
+            <button class="nav-item" data-scroll-target="performance"><span>⌁</span>Performance</button>
+            <button class="nav-item" data-toast="Settings will be available later."><span>⚙</span>Settings</button>
+        </nav>
+
+        <div class="sidebar-footer">Training Project<br><span>Spring Boot + MySQL</span></div>
+    </aside>
+
+    <main class="main-content" id="dashboard">
+        <header class="topbar">
+            <div>
+                <p class="eyebrow">YOUR INVESTMENT OVERVIEW</p>
+                <h1>Portfolio Dashboard</h1>
+            </div>
+            <div class="topbar-actions">
+                <button class="button button-secondary" id="removeSelectedButton">Sell Selected</button>
+                <button class="button button-primary" id="openAddDialogButton">+ Add Asset</button>
+            </div>
+        </header>
+
+        <section class="metric-row" aria-label="投资组合关键数据">
+            <article class="metric-card">
+                <span class="metric-label">Total Portfolio Value</span>
+                <strong id="totalValue">$0.00</strong>
+                <span class="metric-detail" id="holdingCount">0 holdings</span>
+            </article>
+            <article class="metric-card">
+                <span class="metric-label">Total Return</span>
+                <strong id="totalReturn">$0.00</strong>
+                <span class="metric-detail" id="returnPercent">0.00%</span>
+            </article>
+            <article class="metric-card">
+                <span class="metric-label">Cost Basis</span>
+                <strong id="totalCost">$0.00</strong>
+                <span class="metric-detail">Total purchase cost</span>
+            </article>
+        </section>
+
+        <p class="estimate-note">当前没有持仓时，组合指标为 0；下方仍会展示 API 同步的可交易股票与最新价格。</p>
+
+        <section class="panel market-panel" id="market">
+            <div class="panel-heading">
+                <div>
+                    <p class="eyebrow">LIVE MARKET DATA</p>
+                    <h2>Available Assets</h2>
+                </div>
+                <div class="market-actions">
+                    <span class="market-day">Latest API time: <strong id="marketDay">—</strong></span>
+                </div>
+            </div>
+            <p class="market-help">后端在启动时和每天早上同步 API 的整段五分钟行情；页面每分钟刷新显示。买入时可选择历史时间，卖出按最新价格成交。</p>
+            <div class="table-wrapper">
+                <table>
+                    <thead><tr><th>Symbol</th><th>Asset Name</th><th>Type</th><th>Market Price</th><th>Price Time</th></tr></thead>
+                    <tbody id="marketBody"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="panel ai-panel" id="aiAnalysis">
+            <div class="ai-heading">
+                <div class="ai-title-group">
+                    <span class="ai-icon" aria-hidden="true">✦</span>
+                    <div>
+                        <p class="eyebrow">DEEPSEEK STREAMING ANALYSIS</p>
+                        <h2>AI Portfolio Analysis</h2>
+                    </div>
+                </div>
+                <button class="button button-primary" id="startAiAnalysisButton">Analyze Now</button>
+            </div>
+            <p class="ai-home-copy">基于当前持仓和最新市场行情，生成一份独立的流式 AI 分析报告。</p>
+        </section>
+
+        <section class="chart-grid">
+            <article class="panel allocation-panel">
+                <div class="panel-heading">
+                    <div>
+                        <p class="eyebrow">DIVERSIFICATION</p>
+                        <h2>Asset Allocation</h2>
+                    </div>
+                    <span class="panel-badge">By market value</span>
+                </div>
+                <div class="allocation-content">
+                    <div class="donut" id="allocationDonut" aria-label="资产配置圆环图">
+                        <div class="donut-center"><strong id="donutTotal">$0</strong><span>Total value</span></div>
+                    </div>
+                    <div class="allocation-legend" id="allocationLegend"></div>
+                </div>
+            </article>
+
+            <article class="panel" id="performance">
+                <div class="panel-heading">
+                    <div>
+                        <p class="eyebrow">ESTIMATED TREND</p>
+                        <h2>Portfolio Performance</h2>
+                    </div>
+                    <span class="return-pill" id="performanceReturn">+0.00%</span>
+                </div>
+                <div class="chart-wrapper">
+                    <canvas id="performanceChart" aria-label="投资组合表现折线图"></canvas>
+                </div>
+                <div class="chart-labels"><span>Apr</span><span>May</span><span>Jun</span><span>Jul</span><span>Aug</span></div>
+            </article>
+        </section>
+
+        <section class="panel holdings-panel" id="holdings">
+            <div class="panel-heading">
+                <div>
+                    <p class="eyebrow">CURRENT ASSETS</p>
+                    <h2>Your Holdings</h2>
+                </div>
+            </div>
+            <p class="holding-help">在左侧单选框选择一笔持仓，点击 Sell 后输入卖出数量；成交价由最新市场行情决定。</p>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                    <tr>
+                        <th aria-label="选择持仓"></th>
+                        <th>Symbol</th>
+                        <th>Asset Type</th>
+                        <th>Shares</th>
+                        <th>Current Price*</th>
+                        <th>Cost Basis</th>
+                        <th>Market Value</th>
+                        <th>P/L</th>
+                        <th>Action</th>
+                    </tr>
+                    </thead>
+                    <tbody id="holdingsBody"></tbody>
+                </table>
+            </div>
+            <div class="empty-state" id="emptyState" hidden>
+                <strong>There are no holdings yet.</strong>
+                <span>Add your first investment to the portfolio.</span>
+                <button class="button button-primary" id="emptyAddButton">+ Add Asset</button>
+            </div>
+        </section>
+
+        <section class="value-grid" id="assetValueCards"></section>
+    </main>
+</div>
+
+<dialog id="assetDialog">
+    <form method="dialog" id="assetForm">
+        <div class="dialog-heading">
+            <div>
+                <p class="eyebrow">NEW HOLDING</p>
+                <h2>Add Asset</h2>
+            </div>
+            <button class="icon-button" type="button" id="closeDialogButton" aria-label="关闭">×</button>
+        </div>
+        <label>Available Asset
+            <select id="assetCatalogId" name="assetCatalogId" required></select>
+        </label>
+        <label>Quantity
+            <input id="quantity" name="quantity" type="number" min="0.0001" step="0.0001" placeholder="10" required>
+        </label>
+        <label>Purchase Time
+            <select id="priceTime" name="priceTime" required></select>
+        </label>
+        <p class="form-note">Buy price: <strong id="selectedMarketPrice">—</strong>. Select a historical API time; the server looks up its real price and records the trade.</p>
+        <div class="dialog-actions">
+            <button type="button" class="button button-secondary" id="cancelDialogButton">Cancel</button>
+            <button type="submit" class="button button-primary">Save Asset</button>
+        </div>
+    </form>
+</dialog>
+
+<dialog class="ai-dialog" id="aiAnalysisDialog">
+    <div class="ai-dialog-content">
+        <div class="ai-dialog-heading">
+            <div class="ai-title-group">
+                <span class="ai-icon" aria-hidden="true">✦</span>
+                <div>
+                    <p class="eyebrow">DEEPSEEK STREAMING ANALYSIS</p>
+                    <h2>AI Portfolio Analysis</h2>
+                </div>
+            </div>
+            <div class="ai-actions">
+                <span class="ai-status" id="aiAnalysisStatus"><i></i>Ready to analyze</span>
+                <button class="icon-button" type="button" id="closeAiDialogButton" aria-label="关闭 AI 分析">×</button>
+            </div>
+        </div>
+        <div class="ai-intro">
+            <span>基于当前持仓与最新市场行情</span>
+            <span>固定输出：市场概览 · 持仓分析 · 风险提示 · 操作结论</span>
+        </div>
+        <div class="ai-output" id="aiAnalysisOutput" aria-live="polite">
+            <div class="ai-empty-state"><strong>等待生成分析</strong><span>正在连接 DeepSeek，请稍候。</span></div>
+        </div>
+        <p class="ai-dialog-note">仅用于培训学习和演示，不构成投资建议。</p>
+    </div>
+</dialog>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="app.js"></script>
+</body>
+</html>
