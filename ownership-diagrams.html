@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ownership Diagrams - AI & Cash Modules</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --panel: #ffffff;
+            --line: #e2e8f0;
+            --text: #0f172a;
+            --muted: #64748b;
+            --accent: #2563eb;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            font-family: "Inter", "Segoe UI", Arial, sans-serif;
+            color: var(--text);
+            background:
+                radial-gradient(circle at 12% 10%, rgba(37, 99, 235, 0.28), transparent 34%),
+                radial-gradient(circle at 88% 8%, rgba(14, 165, 233, 0.24), transparent 30%),
+                var(--bg);
+            padding: 24px 14px 40px;
+        }
+
+        .container {
+            max-width: 1320px;
+            margin: 0 auto;
+        }
+
+        .hero {
+            color: #e2e8f0;
+            margin-bottom: 18px;
+        }
+
+        .hero h1 {
+            margin: 0 0 8px;
+            font-size: clamp(24px, 3vw, 34px);
+        }
+
+        .hero p {
+            margin: 0;
+            color: #cbd5e1;
+            line-height: 1.5;
+        }
+
+        .panel {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            box-shadow: 0 22px 50px rgba(2, 6, 23, 0.28);
+            overflow: hidden;
+            margin-bottom: 14px;
+        }
+
+        .panel-header {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--line);
+            background: linear-gradient(180deg, #f8fafc, #f1f5f9);
+        }
+
+        .panel-header h2 {
+            margin: 0 0 4px;
+            font-size: 16px;
+        }
+
+        .panel-header p {
+            margin: 0;
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        .diagram-wrap {
+            overflow: auto;
+            padding: 14px;
+        }
+
+        .mermaid {
+            min-width: 1080px;
+            margin: 0;
+        }
+
+        .note {
+            color: #94a3b8;
+            font-size: 12px;
+            margin: 6px 14px 14px;
+        }
+
+        code {
+            background: #e2e8f0;
+            padding: 1px 6px;
+            border-radius: 6px;
+            font-family: Consolas, "Courier New", monospace;
+            font-size: 12px;
+        }
+
+        @media (max-width: 900px) {
+            .mermaid { min-width: 960px; }
+        }
+    </style>
+</head>
+<body>
+<main class="container">
+    <section class="hero">
+        <h1>职责模块类图与流程图</h1>
+        <p>范围：<code>AiAnalysisController</code>、<code>AiAnalysisService</code>、<code>CashDepositRequest</code>、<code>CashFxService</code>。</p>
+    </section>
+
+    <section class="panel">
+        <div class="panel-header">
+            <h2>1. 类图（Class Diagram）</h2>
+            <p>展示你负责模块与上下游依赖的结构关系。</p>
+        </div>
+        <div class="diagram-wrap">
+<pre class="mermaid">classDiagram
+    direction LR
+
+    class AiAnalysisController {
+        +streamAnalysis(portfolioId): SseEmitter
+    }
+
+    class AiAnalysisService {
+        -portfolioItemRepository: PortfolioItemRepository
+        -assetCatalogRepository: AssetCatalogRepository
+        -portfolioService: PortfolioService
+        -httpClient: HttpClient
+        -apiKey: String
+        -baseUrl: String
+        -model: String
+        +streamAnalysis(portfolioId, emitter): void
+        -buildRequestBody(portfolioId): String
+        -buildHoldingText(holdings): String
+        -buildMarketText(assets): String
+        -readContentToken(data): String
+    }
+
+    class CashDepositRequest {
+        -DEFAULT_CURRENCY_CODE: String = "USD"
+        -portfolioId: Long
+        -amount: BigDecimal
+        -currencyCode: String
+        -currency: String
+        -cashCurrency: String
+        +resolveCurrencyCode(): String
+    }
+
+    class CashFxService {
+        -SUPPORTED_CURRENCIES: Set~String~
+        -fxRateApiClient: FxRateApiClient
+        +getUsdQuote(inputCurrencyCode): FxQuote
+        -normalizeCurrency(inputCurrencyCode): String
+    }
+
+    class FxQuote {
+        +currencyCode: String
+        +usdRate: BigDecimal
+    }
+
+    class PortfolioItemRepository
+    class AssetCatalogRepository
+    class PortfolioService
+    class FxRateApiClient
+    class SseEmitter
+    class HttpClient
+
+    AiAnalysisController --> AiAnalysisService : call
+    AiAnalysisService --> PortfolioItemRepository : holdings
+    AiAnalysisService --> AssetCatalogRepository : market
+    AiAnalysisService --> PortfolioService : requirePortfolioId
+    AiAnalysisService --> HttpClient : call DeepSeek API
+    AiAnalysisService --> SseEmitter : emit token/complete/error
+    CashFxService --> FxRateApiClient : getToUsdRate
+    CashFxService --> FxQuote : return
+</pre>
+        </div>
+    </section>
+
+    <section class="panel">
+        <div class="panel-header">
+            <h2>2. AI 分析主流程（SSE Flow）</h2>
+            <p>从前端发起到 token 流式返回的完整路径。</p>
+        </div>
+        <div class="diagram-wrap">
+<pre class="mermaid">flowchart TD
+    A[前端调用 GET /api/ai-analysis/stream] --> B[AiAnalysisController 创建 SseEmitter]
+    B --> B1[SSE 超时 120000ms]
+    B1 --> C[CompletableFuture 异步调用 AiAnalysisService.streamAnalysis]
+    C --> D{是否配置 deepseek.api-key}
+    D -- 否 --> E[发送 ai-error: 未配置 API Key]
+    E --> F[emitter.complete]
+    D -- 是 --> G[portfolioService.requirePortfolioId]
+    G --> H[portfolioItemRepository.findAll 获取持仓]
+    H --> I[assetCatalogRepository.findAllWithLatestPrice 获取行情]
+    I --> J[buildRequestBody 构造系统提示词和用户数据]
+    J --> K[HttpClient POST DeepSeek /chat/completions]
+    K --> K1[参数 stream=true, temperature=0.2, max_tokens=700]
+    K1 --> K2[connectTimeout=10s, requestTimeout=90s]
+    K2 --> L{HTTP 状态是否 200}
+    L -- 否 --> M[发送 ai-error: DeepSeek 调用失败]
+    M --> F
+    L -- 是 --> N[逐行读取 SSE data]
+    N --> O{data == [DONE]?}
+    O -- 否 --> P[readContentToken 提取 delta.content]
+    P --> Q{token 是否为空}
+    Q -- 否 --> R[发送 token 事件给前端]
+    R --> N
+    Q -- 是 --> N
+    O -- 是 --> S[发送 complete: done]
+    S --> F
+    C -.异常.-> T[发送 ai-error: AI 分析暂时不可用]
+    T --> F
+</pre>
+        </div>
+    </section>
+
+    <section class="panel">
+        <div class="panel-header">
+            <h2>3. 现金入账与汇率处理流程（Cash + FX Flow）</h2>
+            <p>描述 DTO 字段兼容、币种规范化和汇率异常语义。</p>
+        </div>
+        <div class="diagram-wrap">
+<pre class="mermaid">flowchart TD
+    A[接收 CashDepositRequest JSON] --> B[解析 amount / portfolioId / currencyCode]
+    B --> C[resolveCurrencyCode]
+    C --> C1{currencyCode 有值?}
+    C1 -- 是 --> D[使用 currencyCode]
+    C1 -- 否 --> C2{currency 有值?}
+    C2 -- 是 --> D1[使用 currency]
+    C2 -- 否 --> C3{cashCurrency 有值?}
+    C3 -- 是 --> D2[使用 cashCurrency]
+    C3 -- 否 --> D3[默认 USD]
+    D --> E[CashFxService.getUsdQuote]
+    D1 --> E
+    D2 --> E
+    D3 --> E
+    E --> F[normalizeCurrency: trim + uppercase]
+    F --> G{是否在支持列表 USD/GBP/EUR/CNY/JPY/HKD}
+    G -- 否 --> H[抛 400 BAD_REQUEST Unsupported currencyCode]
+    G -- 是 --> I[FxRateApiClient.getToUsdRate]
+    I --> J{调用成功?}
+    J -- 否 --> K[抛 502 BAD_GATEWAY Unable to fetch exchange rate]
+    J -- 是 --> L[返回 FxQuote(currencyCode, usdRate)]
+</pre>
+        </div>
+        <p class="note">若页面空白，通常是网络策略阻断了 jsdelivr；可改为本地 Mermaid 静态资源。</p>
+    </section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+    mermaid.initialize({
+        startOnLoad: true,
+        securityLevel: "loose",
+        theme: "base",
+        flowchart: { curve: "basis", htmlLabels: true },
+        themeVariables: {
+            fontFamily: "Inter, Segoe UI, Arial, sans-serif",
+            primaryColor: "#eff6ff",
+            primaryBorderColor: "#93c5fd",
+            primaryTextColor: "#0f172a",
+            lineColor: "#334155",
+            secondaryColor: "#f8fafc",
+            tertiaryColor: "#e2e8f0"
+        }
+    });
+</script>
+</body>
+</html>
