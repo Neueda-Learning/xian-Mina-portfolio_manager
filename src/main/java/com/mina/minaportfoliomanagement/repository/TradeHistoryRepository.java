@@ -14,8 +14,8 @@ public class TradeHistoryRepository {
 
     public void save(TradeHistory trade) {
         String sql = "INSERT INTO trade_history "
-                + "(portfolio_id, asset_catalog_id, trade_type, quantity, trade_price, trade_time) VALUES (?, ?, ?, ?, ?, ?)";
-        jdbcTemplate.update(sql, trade.getPortfolioId(), trade.getAssetCatalogId(), trade.getTradeType(),
+                + "(asset_catalog_id, trade_type, quantity, trade_price, trade_time) VALUES (?, ?, ?, ?, ?)";
+        jdbcTemplate.update(sql, trade.getAssetCatalogId(), trade.getTradeType(),
                 trade.getQuantity(), trade.getTradePrice(), trade.getTradeTime());
     }
 }

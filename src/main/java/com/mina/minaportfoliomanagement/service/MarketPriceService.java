@@ -32,17 +32,20 @@ public class MarketPriceService {
     private final AssetPriceHistoryRepository priceHistoryRepository;
     private final MarketPriceApiClient marketPriceApiClient;
     private final CoinGeckoApiClient coinGeckoApiClient;
+    private final TwelveDataApiClient twelveDataApiClient;
     private final PerformanceService performanceService;
 
     public MarketPriceService(AssetCatalogRepository assetCatalogRepository,
                               AssetPriceHistoryRepository priceHistoryRepository,
                               MarketPriceApiClient marketPriceApiClient,
                               CoinGeckoApiClient coinGeckoApiClient,
+                              TwelveDataApiClient twelveDataApiClient,
                               PerformanceService performanceService) {
         this.assetCatalogRepository = assetCatalogRepository;
         this.priceHistoryRepository = priceHistoryRepository;
         this.marketPriceApiClient = marketPriceApiClient;
         this.coinGeckoApiClient = coinGeckoApiClient;
+        this.twelveDataApiClient = twelveDataApiClient;
         this.performanceService = performanceService;
     }
 
@@ -76,10 +79,12 @@ public class MarketPriceService {
     /** 首次启动或手动刷新时，同时同步股票历史和加密货币最新价格。 */
     public List<MarketAssetView> refreshMarketPrices() {
         assetCatalogRepository.ensureCryptoAssets();
+        assetCatalogRepository.ensureFundAssets();
         refreshStockPrices();
         refreshCryptoPrices();
+        refreshFundPrices();
         // 全部最新行情写入后，用同一个市场时间保存一次组合总市值。
-        performanceService.recordAllPortfoliosValue();
+        performanceService.recordCurrentPortfolioValue();
         return getMarketAssets();
     }
 
@@ -110,6 +115,26 @@ public class MarketPriceService {
             }
         } catch (RuntimeException exception) {
             logger.warn("CoinGecko price synchronization failed. Existing prices are kept.", exception);
+        }
+    }
+
+    /**
+     * 基金同步的是每日公布的净值，因此只在项目启动、手动刷新和每日定时刷新时执行。
+     * 与每五分钟同步一次的加密货币任务分开，避免浪费 Twelve Data 的请求额度。
+     */
+    private void refreshFundPrices() {
+        if (!twelveDataApiClient.isConfigured()) {
+            logger.warn("TWELVE_DATA_API_KEY is not configured. Fund prices are skipped.");
+            return;
+        }
+
+        try {
+            for (AssetCatalog asset : assetCatalogRepository.findAllFunds()) {
+                MarketQuote quote = twelveDataApiClient.getLatestFundQuote(asset.getTicker());
+                priceHistoryRepository.savePrices(asset.getId(), List.of(quote));
+            }
+        } catch (RuntimeException exception) {
+            logger.warn("Fund price synchronization failed. Existing prices are kept.", exception);
         }
     }
 }
