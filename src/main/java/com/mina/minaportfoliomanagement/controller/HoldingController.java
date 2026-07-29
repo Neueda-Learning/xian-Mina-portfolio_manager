@@ -35,6 +35,11 @@ public class HoldingController {
         return ResponseEntity.status(HttpStatus.CREATED).body(holdingService.createItem(request));
     }
 
+    @PostMapping("/cash")
+    public ResponseEntity<HoldingView> addCash(@RequestBody CashDepositRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(holdingService.addCash(request));
+    }
+
     @PostMapping("/{id}/sell")
     public ResponseEntity<Void> sellItem(@PathVariable long id, @RequestParam(required = false) Long portfolioId,
                                          @RequestBody SellRequest request) {
@@ -47,4 +52,5 @@ public class HoldingController {
         holdingService.deleteItem(id, portfolioId);
         return ResponseEntity.noContent().build();
     }
+
 }
