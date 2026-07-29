@@ -62,7 +62,7 @@ public class MarketPriceService {
     }
 
     /** 首次启动立刻拉取价格，保证页面打开时已经有市场数据。 */
-    @PostConstruct
+    //@PostConstruct
     public void loadPricesOnStartup() {
         refreshMarketPrices();
     }

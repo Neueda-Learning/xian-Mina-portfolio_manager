@@ -6,10 +6,19 @@ import java.math.BigDecimal;
 
 public class CashDepositRequest {
     private static final String DEFAULT_CURRENCY_CODE = "USD";
+    private Long portfolioId;
     private BigDecimal amount;
     private String currencyCode;
     private String currency;
     private String cashCurrency;
+
+    public Long getPortfolioId() {
+        return portfolioId;
+    }
+
+    public void setPortfolioId(Long portfolioId) {
+        this.portfolioId = portfolioId;
+    }
 
     public BigDecimal getAmount() {
         return amount;
