@@ -106,4 +106,36 @@ public class AssetCatalogRepository {
         ), id);
         return result.stream().findFirst();
     }
+
+    public Optional<AssetCatalog> findByTicker(String ticker) {
+        String sql = "SELECT id, ticker, asset_name, asset_type FROM asset_catalog WHERE ticker = ?";
+        List<AssetCatalog> result = jdbcTemplate.query(sql, (resultSet, rowNum) -> new AssetCatalog(
+                resultSet.getLong("id"),
+                resultSet.getString("ticker"),
+                resultSet.getString("asset_name"),
+                resultSet.getString("asset_type")
+        ), ticker);
+        return result.stream().findFirst();
+    }
+
+    public AssetCatalog ensureCashAsset(String currencyCode) {
+        String normalizedCurrency = currencyCode.toUpperCase();
+        String ticker = "CASH_" + normalizedCurrency;
+        String assetName = "Cash (" + normalizedCurrency + ")";
+        return findByTicker(ticker).orElseGet(() -> {
+            org.springframework.jdbc.support.GeneratedKeyHolder keyHolder = new org.springframework.jdbc.support.GeneratedKeyHolder();
+            jdbcTemplate.update(connection -> {
+                java.sql.PreparedStatement ps = connection.prepareStatement(
+                        "INSERT INTO asset_catalog (ticker, asset_name, asset_type) VALUES (?, ?, ?)",
+                        new String[]{"id"}
+                );
+                ps.setString(1, ticker);
+                ps.setString(2, assetName);
+                ps.setString(3, "CASH");
+                return ps;
+            }, keyHolder);
+            Number key = keyHolder.getKey();
+            return new AssetCatalog(key.longValue(), ticker, assetName, "CASH");
+        });
+    }
 }
