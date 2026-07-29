@@ -1,8 +1,9 @@
 const API_URL = "/api/portfolio-items";
-const TYPE_ORDER = ["STOCK", "BOND", "CRYPTO", "CASH"];
+const TYPE_ORDER = ["STOCK", "BOND", "FUND", "CRYPTO", "CASH"];
 const TYPE_META = {
     STOCK: { label: "Stocks", color: "#1768d5" },
     BOND: { label: "Bonds", color: "#028b78" },
+    FUND: { label: "Funds", color: "#805ad5" },
     CRYPTO: { label: "Crypto", color: "#dc4b58" },
     CASH: { label: "Cash", color: "#eeb547" }
 };
