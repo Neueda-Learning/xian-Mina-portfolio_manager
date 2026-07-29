@@ -4,6 +4,7 @@ import com.mina.minaportfoliomanagement.service.AiAnalysisService;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -21,9 +22,9 @@ public class AiAnalysisController {
     }
 
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter streamAnalysis() {
+    public SseEmitter streamAnalysis(@RequestParam(required = false) Long portfolioId) {
         SseEmitter emitter = new SseEmitter(120_000L);
-        CompletableFuture.runAsync(() -> aiAnalysisService.streamAnalysis(emitter));
+        CompletableFuture.runAsync(() -> aiAnalysisService.streamAnalysis(portfolioId, emitter));
         return emitter;
     }
 }
