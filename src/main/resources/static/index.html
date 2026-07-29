@@ -10,8 +10,8 @@
 <div class="app-shell">
     <aside class="sidebar">
         <div class="brand">
-            <span class="brand-mark">PM</span>
-            <span>Portfolio<br>Manager</span>
+            <span class="brand-mark">M </span>
+            <span>Mina</span>
         </div>
 
         <nav class="nav-menu" aria-label="主导航">
@@ -19,6 +19,7 @@
             <button class="nav-item" data-scroll-target="market"><span>◈</span>Market Prices</button>
             <button class="nav-item" data-scroll-target="holdings"><span>▤</span>Holdings</button>
             <button class="nav-item" data-scroll-target="performance"><span>⌁</span>Performance</button>
+            <button class="nav-item" id="addCashButton"><span>＋</span>Add Cash</button>
             <button class="nav-item" data-toast="Settings will be available later."><span>⚙</span>Settings</button>
         </nav>
 
@@ -181,6 +182,26 @@
         <div class="dialog-actions">
             <button type="button" class="button button-secondary" id="cancelDialogButton">Cancel</button>
             <button type="submit" class="button button-primary">Save Asset</button>
+        </div>
+    </form>
+</dialog>
+
+<dialog id="cashDialog">
+    <form method="dialog" id="cashForm">
+        <div class="dialog-heading">
+            <div>
+                <p class="eyebrow">ADD CASH</p>
+                <h2>Deposit Cash</h2>
+            </div>
+            <button class="icon-button" type="button" id="closeCashDialogButton" aria-label="关闭">×</button>
+        </div>
+        <label>Amount
+            <input id="cashAmount" name="cashAmount" type="number" min="0.01" step="0.01" placeholder="1000" required>
+        </label>
+        <p class="form-note">现金会作为 CASH 资产进入组合，按 1.00 计价。</p>
+        <div class="dialog-actions">
+            <button type="button" class="button button-secondary" id="cancelCashDialogButton">Cancel</button>
+            <button type="submit" class="button button-primary">Add Cash</button>
         </div>
     </form>
 </dialog>

@@ -13,9 +13,9 @@ public class PerformanceRepository {
         this.jdbcTemplate = jdbcTemplate;
     }
     public BigDecimal calculateCurrentPortfolioValue() {
-        String sql = "SELECT COALESCE(SUM(p.quantity * latest_price.market_price), 0) AS total_market_value "
+        String sql = "SELECT COALESCE(SUM(p.quantity * COALESCE(latest_price.market_price, p.purchase_price)), 0) AS total_market_value "
                 + "FROM portfolio_item p "
-                + "JOIN asset_price_history latest_price ON latest_price.id = ("
+                + "LEFT JOIN asset_price_history latest_price ON latest_price.id = ("
                 + "SELECT ph.id FROM asset_price_history ph WHERE ph.asset_catalog_id = p.asset_catalog_id "
                 + "ORDER BY ph.price_time DESC, ph.id DESC LIMIT 1)";
         return jdbcTemplate.queryForObject(sql, BigDecimal.class);

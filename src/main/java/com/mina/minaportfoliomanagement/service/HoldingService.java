@@ -1,6 +1,7 @@
 package com.mina.minaportfoliomanagement.service;
 
 import com.mina.minaportfoliomanagement.dto.BuyRequest;
+import com.mina.minaportfoliomanagement.dto.CashDepositRequest;
 import com.mina.minaportfoliomanagement.dto.HoldingView;
 import com.mina.minaportfoliomanagement.dto.MarketAssetView;
 import com.mina.minaportfoliomanagement.dto.SellRequest;
@@ -17,6 +18,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -90,6 +92,39 @@ public class HoldingService {
         }
         tradeHistoryRepository.save(new TradeHistory(item.getAssetCatalogId(), "BUY", item.getQuantity(),
                 marketQuote.price(), marketQuote.priceTime()));
+        HoldingView result = getItem(id);
+        performanceService.recordCurrentPortfolioValue();
+        return result;
+    }
+
+    public HoldingView addCash(CashDepositRequest request) {
+        if (request.getAmount() == null || request.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "amount must be greater than zero");
+        }
+
+        var cashAsset = assetCatalogRepository.ensureCashAsset();
+        BigDecimal amount = request.getAmount().setScale(2, RoundingMode.HALF_UP);
+        LocalDateTime now = LocalDateTime.now();
+
+        PortfolioItem item = new PortfolioItem();
+        item.setAssetCatalogId(cashAsset.getId());
+        item.setQuantity(amount);
+        item.setPurchasePrice(BigDecimal.ONE);
+        item.setPurchaseTime(now);
+
+        long id;
+        var existingHolding = portfolioItemRepository.findByAssetCatalogId(item.getAssetCatalogId());
+        if (existingHolding.isPresent()) {
+            PortfolioItem existing = existingHolding.get();
+            BigDecimal totalQuantity = existing.getQuantity().add(item.getQuantity());
+            portfolioItemRepository.updateHolding(existing.getId(), totalQuantity, BigDecimal.ONE, now);
+            id = existing.getId();
+        } else {
+            id = portfolioItemRepository.save(item);
+        }
+
+        tradeHistoryRepository.save(new TradeHistory(item.getAssetCatalogId(), "DEPOSIT", item.getQuantity(),
+                BigDecimal.ONE, now));
         HoldingView result = getItem(id);
         performanceService.recordCurrentPortfolioValue();
         return result;

@@ -1,6 +1,7 @@
 package com.mina.minaportfoliomanagement.controller;
 
 import com.mina.minaportfoliomanagement.dto.BuyRequest;
+import com.mina.minaportfoliomanagement.dto.CashDepositRequest;
 import com.mina.minaportfoliomanagement.dto.HoldingView;
 import com.mina.minaportfoliomanagement.dto.SellRequest;
 import com.mina.minaportfoliomanagement.service.HoldingService;
@@ -31,6 +32,11 @@ public class HoldingController {
     @PostMapping
     public ResponseEntity<HoldingView> createItem(@RequestBody BuyRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(holdingService.createItem(request));
+    }
+
+    @PostMapping("/cash")
+    public ResponseEntity<HoldingView> addCash(@RequestBody CashDepositRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(holdingService.addCash(request));
     }
 
     @PostMapping("/{id}/sell")
