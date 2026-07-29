@@ -20,7 +20,7 @@ public class PortfolioItemRepository {
 
     private String selectHoldingSql() {
         //子查询取该资产最新的市场价格。
-        return "SELECT p.id, p.asset_catalog_id, a.ticker, a.asset_name, a.asset_type, p.quantity, p.purchase_price, p.created_at, "
+        return "SELECT p.id, p.portfolio_id, p.asset_catalog_id, a.ticker, a.asset_name, a.asset_type, p.quantity, p.purchase_price, p.created_at, "
                 + "latest_price.market_price FROM portfolio_item p JOIN asset_catalog a ON a.id = p.asset_catalog_id "
                 + "JOIN asset_price_history latest_price ON latest_price.id = ("
                 + "SELECT ph.id FROM asset_price_history ph WHERE ph.asset_catalog_id = a.id "
@@ -28,16 +28,17 @@ public class PortfolioItemRepository {
     }
 
 
-    private HoldingView mapRow(long id, long assetCatalogId, String ticker, String assetName, String assetType,
+    private HoldingView mapRow(long id, long portfolioId, long assetCatalogId, String ticker, String assetName, String assetType,
                                BigDecimal quantity, BigDecimal purchasePrice, BigDecimal currentPrice,
                                java.time.LocalDateTime createdAt) {
-        return new HoldingView(id, assetCatalogId, ticker, assetName, assetType, quantity, purchasePrice, currentPrice, createdAt);
+        return new HoldingView(id, portfolioId, assetCatalogId, ticker, assetName, assetType, quantity, purchasePrice, currentPrice, createdAt);
     }
 
-    public List<HoldingView> findAll() {
-        String sql = selectHoldingSql() + " ORDER BY p.purchase_time DESC, p.id DESC";
+    public List<HoldingView> findAll(long portfolioId) {
+        String sql = selectHoldingSql() + " WHERE p.portfolio_id = ? ORDER BY p.purchase_time DESC, p.id DESC";
         return jdbcTemplate.query(sql, (rs, rowNum) -> mapRow(
                 rs.getLong("id"),
+                rs.getLong("portfolio_id"),
                 rs.getLong("asset_catalog_id"),
                 rs.getString("ticker"),
                 rs.getString("asset_name"),
@@ -46,62 +47,62 @@ public class PortfolioItemRepository {
                 rs.getBigDecimal("purchase_price"),
                 rs.getBigDecimal("market_price"),
                 rs.getTimestamp("created_at").toLocalDateTime()
-        ));
+        ), portfolioId);
     }
 
-    public Optional<HoldingView> findById(long id) {
-        String sql = selectHoldingSql() + " WHERE p.id = ?";
+    public Optional<HoldingView> findById(long id, long portfolioId) {
+        String sql = selectHoldingSql() + " WHERE p.id = ? AND p.portfolio_id = ?";
         List<HoldingView> results = jdbcTemplate.query(sql, (rs, rowNum) -> mapRow(
-                rs.getLong("id"), rs.getLong("asset_catalog_id"), rs.getString("ticker"), rs.getString("asset_name"), rs.getString("asset_type"),
+                rs.getLong("id"), rs.getLong("portfolio_id"), rs.getLong("asset_catalog_id"), rs.getString("ticker"), rs.getString("asset_name"), rs.getString("asset_type"),
                 rs.getBigDecimal("quantity"), rs.getBigDecimal("purchase_price"),
                 rs.getBigDecimal("market_price"),
                 rs.getTimestamp("created_at").toLocalDateTime()
-        ), id);
+        ), id, portfolioId);
         return results.stream().findFirst();
     }
 
-    public Optional<PortfolioItem> findByAssetCatalogId(long assetCatalogId) {
-        String sql = "SELECT id, asset_catalog_id, quantity, purchase_price, purchase_time, created_at "
-                + "FROM portfolio_item WHERE asset_catalog_id = ?";
+    public Optional<PortfolioItem> findByAssetCatalogId(long portfolioId, long assetCatalogId) {
+        String sql = "SELECT id, portfolio_id, asset_catalog_id, quantity, purchase_price, purchase_time, created_at "
+                + "FROM portfolio_item WHERE portfolio_id = ? AND asset_catalog_id = ?";
         List<PortfolioItem> results = jdbcTemplate.query(sql, (rs, rowNum) -> new PortfolioItem(
-                rs.getLong("id"), rs.getLong("asset_catalog_id"),
+                rs.getLong("id"), rs.getLong("portfolio_id"), rs.getLong("asset_catalog_id"),
                 rs.getBigDecimal("quantity"), rs.getBigDecimal("purchase_price"),
                 rs.getTimestamp("purchase_time").toLocalDateTime(),
                 rs.getTimestamp("created_at").toLocalDateTime()
-        ), assetCatalogId);
+        ), portfolioId, assetCatalogId);
         return results.stream().findFirst();
     }
 
     public long save(PortfolioItem item) {
-        String sql = "INSERT INTO portfolio_item (asset_catalog_id, quantity, purchase_price, purchase_time) VALUES (?, ?, ?, ?)";
+        String sql = "INSERT INTO portfolio_item (portfolio_id, asset_catalog_id, quantity, purchase_price, purchase_time) VALUES (?, ?, ?, ?, ?)";
         // KeyHolder 可以取得本次买入的持仓 id；买入价格来自当天市场价格。
         org.springframework.jdbc.support.GeneratedKeyHolder keyHolder = new org.springframework.jdbc.support.GeneratedKeyHolder();
         jdbcTemplate.update(connection -> {
             java.sql.PreparedStatement ps = connection.prepareStatement(sql, new String[]{"id"});
-            ps.setLong(1, item.getAssetCatalogId());
-            ps.setBigDecimal(2, item.getQuantity());
-            ps.setBigDecimal(3, item.getPurchasePrice());
-            ps.setObject(4, item.getPurchaseTime());
+            ps.setLong(1, item.getPortfolioId());
+            ps.setLong(2, item.getAssetCatalogId());
+            ps.setBigDecimal(3, item.getQuantity());
+            ps.setBigDecimal(4, item.getPurchasePrice());
+            ps.setObject(5, item.getPurchaseTime());
             return ps;
         }, keyHolder);
         Number key = keyHolder.getKey();
         return key.longValue();
     }
 
-    public int deleteById(long id) {
-        return jdbcTemplate.update("DELETE FROM portfolio_item WHERE id = ?", id);
+    public int deleteById(long id, long portfolioId) {
+        return jdbcTemplate.update("DELETE FROM portfolio_item WHERE id = ? AND portfolio_id = ?", id, portfolioId);
     }
 
-    public int updateQuantity(long id, BigDecimal remainingQuantity) {
-        return jdbcTemplate.update("UPDATE portfolio_item SET quantity = ? WHERE id = ?", remainingQuantity, id);
+    public int updateQuantity(long id, long portfolioId, BigDecimal remainingQuantity) {
+        return jdbcTemplate.update("UPDATE portfolio_item SET quantity = ? WHERE id = ? AND portfolio_id = ?", remainingQuantity, id, portfolioId);
     }
 
-    public int updateHolding(long id, BigDecimal quantity, BigDecimal averagePurchasePrice,
+    public int updateHolding(long id, long portfolioId, BigDecimal quantity, BigDecimal averagePurchasePrice,
                              java.time.LocalDateTime latestPurchaseTime) {
-        String sql = "UPDATE portfolio_item SET quantity = ?, purchase_price = ?, purchase_time = ? WHERE id = ?";
-        return jdbcTemplate.update(sql, quantity, averagePurchasePrice, latestPurchaseTime, id);
+        String sql = "UPDATE portfolio_item SET quantity = ?, purchase_price = ?, purchase_time = ? WHERE id = ? AND portfolio_id = ?";
+        return jdbcTemplate.update(sql, quantity, averagePurchasePrice, latestPurchaseTime, id, portfolioId);
     }
-
 
 
 }
