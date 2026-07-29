@@ -55,7 +55,10 @@ h2 { font-size: 19px; }
 .portfolio-switcher { display: flex; align-items: center; gap: 9px; margin-top: 12px; }
 .portfolio-switcher label { color: #8090a8; font-size: 10px; font-weight: 850; letter-spacing: 1px; }
 .portfolio-switcher select { min-width: 190px; border: 1px solid #ccd6e4; border-radius: 6px; padding: 7px 30px 7px 9px; color: var(--navy); background: #fff; font-size: 12px; font-weight: 750; }
-.topbar-actions { display: flex; gap: 10px; }
+.topbar-actions { display: flex; align-items: center; gap: 10px; }
+.asset-add-actions { display: grid; grid-template-columns: repeat(4, max-content); gap: 8px; }
+.asset-add-actions .button { min-width: 105px; padding: 10px 11px; }
+.button:disabled { cursor: not-allowed; opacity: .58; box-shadow: none; }
 .button { border-radius: 7px; padding: 10px 14px; font-size: 14px; font-weight: 750; border: 1px solid transparent; }
 .button-primary { background: var(--blue); color: #fff; box-shadow: 0 4px 12px #1768d533; }
 .button-primary:hover { background: #0f59ba; }
@@ -163,6 +166,7 @@ dialog input, dialog select { width: 100%; border: 1px solid #ccd6e4; border-rad
 dialog input:focus, dialog select:focus { outline: 2px solid #1768d544; border-color: var(--blue); }
 .icon-button { border: 0; background: transparent; color: #728097; font-size: 26px; line-height: 1; }
 .form-note { color: #8390a4; font-size: 12px; line-height: 1.45; margin: -2px 0 1px; }
+.historical-price-hint { display: block; margin-top: 4px; }
 .dialog-actions { justify-content: flex-end; margin-top: 4px; }
 .toast { opacity: 0; pointer-events: none; position: fixed; right: 24px; bottom: 24px; z-index: 10; border-radius: 8px; padding: 12px 15px; background: #172a46; color: white; font-size: 13px; box-shadow: 0 7px 20px #15243a44; transform: translateY(10px); transition: .22s ease; }
 .toast.show { opacity: 1; transform: translateY(0); }
@@ -177,7 +181,10 @@ dialog input:focus, dialog select:focus { outline: 2px solid #1768d544; border-c
 @media (max-width: 700px) {
     .main-content { padding: 22px 14px 38px; }
     .topbar, .metric-row { align-items: stretch; flex-direction: column; }
-    .topbar-actions .button { flex: 1; }
+    .topbar-actions { align-items: stretch; }
+    .topbar-actions > .button { flex: 1; }
+    .asset-add-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); flex: 3; }
+    .asset-add-actions .button { min-width: 0; }
     .portfolio-switcher { align-items: flex-start; flex-wrap: wrap; }
     .metric-row { gap: 10px; }
     .allocation-content { gap: 22px; flex-direction: column; padding: 18px 0; }

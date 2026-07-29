@@ -9,7 +9,7 @@ const TYPE_META = {
 const state = { portfolios: [], activePortfolioId: null, items: [], performance: [], marketAssets: [], selectedId: null };
 const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 
-const dialog = document.querySelector("#assetDialog");
+const assetDialogs = [...document.querySelectorAll(".asset-dialog")];
 const portfolioDialog = document.querySelector("#portfolioDialog");
 const aiDialog = document.querySelector("#aiAnalysisDialog");
 const toast = document.querySelector("#toast");
@@ -176,11 +176,114 @@ function renderMarketAssets() {
         <tr><td class="symbol">${escapeHtml(asset.ticker)}</td><td>${escapeHtml(asset.assetName)}</td>
         <td>${TYPE_META[asset.assetType]?.label || asset.assetType}</td>
         <td class="number">${money.format(Number(asset.marketPrice))}</td><td>${asset.priceTime}</td></tr>`).join("");
-    select.innerHTML = state.marketAssets.map(asset =>
-        `<option value="${asset.id}">${escapeHtml(asset.ticker)} — ${escapeHtml(asset.assetName)}</option>`).join("");
+    // The old single Add Asset select no longer exists. Keep this guard so the
+    // market table still renders while the three typed dialogs manage their own selects.
+    if (select) {
+        select.innerHTML = state.marketAssets.map(asset =>
+            `<option value="${asset.id}">${escapeHtml(asset.ticker)} — ${escapeHtml(asset.assetName)}</option>`).join("");
+        loadPriceOptions();
+    }
     const marketDay = state.marketAssets[0]?.priceTime || "—";
     document.querySelector("#marketDay").textContent = marketDay;
-    loadPriceOptions();
+    renderOpenAssetDialogs();
+}
+
+function getAssetDialogParts(dialog) {
+    return {
+        type: dialog.dataset.assetType,
+        form: dialog.querySelector(".asset-form"),
+        search: dialog.querySelector(".asset-search"),
+        assetSelect: dialog.querySelector(".asset-catalog-id"),
+        quantity: dialog.querySelector(".asset-quantity"),
+        priceTime: dialog.querySelector(".price-time")
+    };
+}
+
+function assetsForType(type, searchText = "") {
+    const keyword = searchText.trim().toLowerCase();
+    return state.marketAssets.filter(asset => {
+        const sameType = String(asset.assetType).toUpperCase() === type;
+        const searchable = `${asset.ticker} ${asset.assetName}`.toLowerCase();
+        return sameType && (!keyword || searchable.includes(keyword));
+    });
+}
+
+function renderAssetOptions(dialog) {
+    const parts = getAssetDialogParts(dialog);
+    const assets = assetsForType(parts.type, parts.search.value);
+    if (!assets.length) {
+        parts.assetSelect.innerHTML = '<option value="">No matching asset found</option>';
+        parts.priceTime.innerHTML = "";
+        return;
+    }
+    parts.assetSelect.innerHTML = assets.map(asset =>
+        `<option value="${asset.id}">${escapeHtml(asset.ticker)} — ${escapeHtml(asset.assetName)}</option>`).join("");
+    loadDialogPriceOptions(dialog);
+}
+
+function openAssetDialog(type) {
+    const dialog = document.querySelector(`.asset-dialog[data-asset-type="${type}"]`);
+    if (!dialog) return;
+    if (!assetsForType(type).length) {
+        showToast(`No ${type.toLowerCase()} market data is available yet.`);
+        return;
+    }
+    const parts = getAssetDialogParts(dialog);
+    parts.form.reset();
+    renderAssetOptions(dialog);
+    dialog.showModal();
+}
+
+async function loadDialogPriceOptions(dialog) {
+    const parts = getAssetDialogParts(dialog);
+    const assetId = Number(parts.assetSelect.value);
+    if (!assetId) {
+        parts.priceTime.innerHTML = "";
+        return;
+    }
+    try {
+        const response = await fetch(`${API_URL}/market/assets/${assetId}/prices`);
+        if (!response.ok) throw new Error("Unable to load price history");
+        const prices = await response.json();
+        parts.priceTime.innerHTML = prices.map((item, index) => {
+            const time = item.priceTime.replace("T", " ");
+            // The API returns newest first. Only the newest option shows its price.
+            const label = index === 0 ? `${time} — Latest ${money.format(Number(item.marketPrice))}` : time;
+            return `<option value="${item.priceTime}" data-price="${item.marketPrice}" data-latest="${index === 0}">${label}</option>`;
+        }).join("");
+    } catch (error) {
+        parts.priceTime.innerHTML = "";
+        showToast("Could not load the selected asset price history.");
+    }
+}
+
+function renderOpenAssetDialogs() {
+    assetDialogs.filter(dialog => dialog.open).forEach(renderAssetOptions);
+}
+
+async function saveTypedAsset(event) {
+    event.preventDefault();
+    const dialog = event.currentTarget.closest(".asset-dialog");
+    const parts = getAssetDialogParts(dialog);
+    const payload = {
+        portfolioId: state.activePortfolioId,
+        assetCatalogId: Number(parts.assetSelect.value),
+        quantity: Number(parts.quantity.value),
+        priceTime: parts.priceTime.value
+    };
+    const response = await fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+    });
+    if (!response.ok) {
+        showToast("Could not save asset. Please check the values.");
+        return;
+    }
+    dialog.close();
+    event.currentTarget.reset();
+    showToast("Asset purchased successfully.");
+    loadItems();
 }
 
 // 根据当前选中的股票读取全部五分钟历史价格，供用户选择买入时点。
@@ -380,10 +483,18 @@ function compactMoney(value) {
 function escapeHtml(value) { return String(value).replace(/[&<>'"]/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[char]); }
 function showToast(message) { clearTimeout(toastTimer); toast.textContent = message; toast.classList.add("show"); toastTimer = setTimeout(() => toast.classList.remove("show"), 2600); }
 
-document.querySelector("#openAddDialogButton").addEventListener("click", () => dialog.showModal());
-document.querySelector("#emptyAddButton").addEventListener("click", () => dialog.showModal());
-document.querySelector("#closeDialogButton").addEventListener("click", () => dialog.close());
-document.querySelector("#cancelDialogButton").addEventListener("click", () => dialog.close());
+document.querySelectorAll("[data-open-asset-dialog]").forEach(button => {
+    button.addEventListener("click", () => openAssetDialog(button.dataset.openAssetDialog));
+});
+assetDialogs.forEach(dialog => {
+    const parts = getAssetDialogParts(dialog);
+    parts.form.addEventListener("submit", saveTypedAsset);
+    parts.search.addEventListener("input", () => renderAssetOptions(dialog));
+    parts.assetSelect.addEventListener("change", () => loadDialogPriceOptions(dialog));
+    dialog.querySelectorAll(".close-asset-dialog").forEach(button => {
+        button.addEventListener("click", () => dialog.close());
+    });
+});
 document.querySelector("#openPortfolioDialogButton").addEventListener("click", () => portfolioDialog.showModal());
 document.querySelector("#closePortfolioDialogButton").addEventListener("click", () => portfolioDialog.close());
 document.querySelector("#cancelPortfolioDialogButton").addEventListener("click", () => portfolioDialog.close());
@@ -432,10 +543,6 @@ aiDialog.addEventListener("close", () => {
     document.querySelector("#startAiAnalysisButton").disabled = false;
     setAiStatus("Analysis closed");
 });
-document.querySelector("#assetForm").addEventListener("submit", saveAsset);
-document.querySelector("#assetCatalogId").addEventListener("change", loadPriceOptions);
-document.querySelector("#priceTime").addEventListener("change", updateSelectedMarketPrice);
-document.querySelector("#removeSelectedButton").addEventListener("click", () => state.selectedId ? sellItem(state.selectedId) : showToast("Select a holding row first."));
 document.querySelector("#startAiAnalysisButton").addEventListener("click", startAiAnalysis);
 document.querySelectorAll("[data-scroll-target]").forEach(button => button.addEventListener("click", () => {
     const target = document.querySelector(`#${button.dataset.scrollTarget}`);
