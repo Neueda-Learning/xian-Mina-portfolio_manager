@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 
 public class HoldingView {
     private Long id;
+    private Long portfolioId;
     private Long assetCatalogId;
     private String ticker;
     private String assetName;
@@ -14,8 +15,9 @@ public class HoldingView {
     private BigDecimal currentPrice;
     private LocalDateTime createdAt;
 
-    public HoldingView(Long id, Long assetCatalogId, String ticker, String assetName, String assetType, BigDecimal quantity, BigDecimal purchasePrice, BigDecimal currentPrice, LocalDateTime createdAt) {
+    public HoldingView(Long id, Long portfolioId, Long assetCatalogId, String ticker, String assetName, String assetType, BigDecimal quantity, BigDecimal purchasePrice, BigDecimal currentPrice, LocalDateTime createdAt) {
         this.id = id;
+        this.portfolioId = portfolioId;
         this.assetCatalogId = assetCatalogId;
         this.ticker = ticker;
         this.assetName = assetName;
@@ -28,6 +30,10 @@ public class HoldingView {
 
     public Long getId() {
         return id;
+    }
+
+    public Long getPortfolioId() {
+        return portfolioId;
     }
 
     public Long getAssetCatalogId() {

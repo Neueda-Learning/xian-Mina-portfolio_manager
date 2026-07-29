@@ -14,16 +14,20 @@ import java.util.List;
 public class SummaryService {
     private final SummaryRepository summaryRepository;
     private final PortfolioItemRepository portfolioItemRepository;
+    private final PortfolioService portfolioService;
 
     public SummaryService(SummaryRepository summaryRepository,
-                          PortfolioItemRepository portfolioItemRepository) {
+                          PortfolioItemRepository portfolioItemRepository,
+                          PortfolioService portfolioService) {
         this.summaryRepository = summaryRepository;
         this.portfolioItemRepository = portfolioItemRepository;
+        this.portfolioService = portfolioService;
     }
 
-    public PortfolioSummary getSummary() {
-        PortfolioSummary summary = summaryRepository.calculateSummary();
-        List<HoldingView> items = portfolioItemRepository.findAll();
+    public PortfolioSummary getSummary(Long portfolioId) {
+        long resolvedPortfolioId = portfolioService.requirePortfolioId(portfolioId);
+        PortfolioSummary summary = summaryRepository.calculateSummary(resolvedPortfolioId);
+        List<HoldingView> items = portfolioItemRepository.findAll(resolvedPortfolioId);
 
         summary.setItemCount(items.size());
         summary.setItems(items);
