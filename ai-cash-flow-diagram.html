@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Service & Cash Flow Diagram</title>
+    <style>
+        :root {
+            --bg-1: #0f172a;
+            --bg-2: #1e293b;
+            --panel: #ffffff;
+            --text: #0f172a;
+            --muted: #475569;
+            --border: #dbe3ee;
+            --shadow: 0 20px 50px rgba(15, 23, 42, 0.2);
+        }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            padding: 36px 20px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background:
+                radial-gradient(circle at 15% 10%, #1d4ed8 0%, transparent 35%),
+                radial-gradient(circle at 85% 5%, #0ea5e9 0%, transparent 30%),
+                linear-gradient(160deg, var(--bg-1), var(--bg-2));
+            color: var(--text);
+            box-sizing: border-box;
+        }
+        * {
+            box-sizing: inherit;
+        }
+        .container {
+            max-width: 1320px;
+            margin: 0 auto;
+        }
+        .hero {
+            margin-bottom: 18px;
+            color: #e2e8f0;
+        }
+        .badge {
+            display: inline-block;
+            margin-bottom: 10px;
+            padding: 6px 10px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 0.4px;
+            text-transform: uppercase;
+            background: rgba(148, 163, 184, 0.18);
+            border: 1px solid rgba(203, 213, 225, 0.3);
+        }
+        h1 {
+            margin: 0;
+            font-size: clamp(24px, 2.5vw, 34px);
+            line-height: 1.2;
+        }
+        .subtitle {
+            margin: 10px 0 0;
+            color: #cbd5e1;
+            font-size: 14px;
+        }
+        .diagram-wrap {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 20px;
+            overflow: auto;
+            box-shadow: var(--shadow);
+        }
+        .diagram-wrap pre {
+            margin: 0;
+        }
+        @media (max-width: 768px) {
+            body {
+                padding: 20px 12px;
+            }
+            .diagram-wrap {
+                padding: 12px;
+                border-radius: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+<main class="container">
+    <section class="hero">
+        <span class="badge">Architecture Flow</span>
+        <h1>AI Service & Cash Flow Diagram</h1>
+        <p class="subtitle">Mina Portfolio Manager · Frontend / Backend / External API / Database</p>
+    </section>
+<div class="diagram-wrap">
+    <pre class="mermaid">
+flowchart TD
+  %% =========================
+  %% Cash Flow
+  %% =========================
+  subgraph CASH["Cash 入金流程"]
+    C1["前端 app.js<br/>saveCash()"] --> C2["POST /api/portfolio-items/cash<br/>amount, currencyCode"]
+    C2 --> C3["HoldingController.addCash()"]
+    C3 --> C4["HoldingService.addCash()"]
+
+    C4 --> C5{"amount > 0 ?"}
+    C5 -- 否 --> CERR1["400 Bad Request"]
+    C5 -- 是 --> C6["CashDepositRequest.resolveCurrencyCode()"]
+
+    C6 --> C7["CashFxService.getUsdQuote()"]
+    C7 --> C8{"币种在支持列表?"}
+    C8 -- 否 --> CERR2["400 Unsupported currency"]
+    C8 -- 是 --> C9["FxRateApiClient.getToUsdRate()"]
+    C9 --> C10["调用 Frankfurter REST API<br/>api.frankfurter.dev/v1/latest"]
+
+    C10 --> C11{"HTTP 200?"}
+    C11 -- 否 --> CERR3["502 Bad Gateway"]
+    C11 -- 是 --> C12["返回 usdRate"]
+
+    C12 --> C13["AssetCatalogRepository.ensureCashAsset()<br/>确保 CASH_XXX 存在"]
+    C13 --> C14["PortfolioItemRepository.findByAssetCatalogId()"]
+
+    C14 --> C15{"已存在该币种现金持仓?"}
+    C15 -- 是 --> C16["updateHolding()<br/>数量累加 + 汇率加权平均"]
+    C15 -- 否 --> C17["save() 新建持仓"]
+
+    C16 --> C18["TradeHistoryRepository.save(DEPOSIT)"]
+    C17 --> C18
+    C18 --> C19["HoldingService.getItem(id)"]
+    C19 --> C20["PerformanceService.recordCurrentPortfolioValue()"]
+    C20 --> C21["201 Created + HoldingView"]
+  end
+
+  %% =========================
+  %% AI Stream Flow
+  %% =========================
+  subgraph AI["AI 分析流式流程"]
+    A1["前端 app.js<br/>startAiAnalysis()"] --> A2["GET /api/ai-analysis/stream<br/>SSE"]
+    A2 --> A3["AiAnalysisController.streamAnalysis()"]
+    A3 --> A4["CompletableFuture.runAsync()"]
+    A4 --> A5["AiAnalysisService.streamAnalysis(emitter)"]
+
+    A5 --> A6{"deepseek.api-key 已配置?"}
+    A6 -- 否 --> AERR1["SSE ai-error<br/>未配置 API Key"]
+    A6 -- 是 --> A7["buildRequestBody()"]
+
+    A7 --> A8["PortfolioItemRepository.findAll()<br/>读取持仓"]
+    A7 --> A9["AssetCatalogRepository.findAllWithLatestPrice()<br/>读取最新行情"]
+    A8 --> A10["拼 system/user prompt"]
+    A9 --> A10
+
+    A10 --> A11["POST DeepSeek /chat/completions<br/>stream=true"]
+    A11 --> A12{"HTTP 200?"}
+    A12 -- 否 --> AERR2["SSE ai-error<br/>DeepSeek 调用失败"]
+    A12 -- 是 --> A13["逐行读取 SSE data"]
+
+    A13 --> A14{"data == DONE ?"}
+    A14 -- 否 --> A15["readContentToken()"]
+    A15 --> A16["SSE token"]
+    A16 --> A13
+    A14 -- 是 --> A17["SSE complete"]
+    A17 --> A18["emitter.complete()"]
+  end
+    </pre>
+</div>
+</main>
+
+<script type="module">
+    import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs";
+    mermaid.initialize({
+        startOnLoad: true,
+        securityLevel: "loose",
+        theme: "base",
+        themeVariables: {
+            primaryColor: "#eff6ff",
+            primaryTextColor: "#0f172a",
+            primaryBorderColor: "#93c5fd",
+            lineColor: "#334155",
+            secondaryColor: "#f8fafc",
+            tertiaryColor: "#e2e8f0",
+            clusterBkg: "#f8fafc",
+            clusterBorder: "#cbd5e1",
+            fontFamily: "Segoe UI, Roboto, Arial, sans-serif"
+        }
+    });
+</script>
+</body>
+</html>
