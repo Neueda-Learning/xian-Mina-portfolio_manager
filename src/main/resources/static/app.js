@@ -10,6 +10,7 @@ const state = { items: [], performance: [], marketAssets: [], selectedId: null }
 const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 
 const dialog = document.querySelector("#assetDialog");
+const cashDialog = document.querySelector("#cashDialog");
 const aiDialog = document.querySelector("#aiAnalysisDialog");
 const toast = document.querySelector("#toast");
 let toastTimer;
@@ -231,6 +232,33 @@ async function saveAsset(event) {
     loadItems();
 }
 
+async function addCash() {
+    cashDialog.showModal();
+}
+
+async function saveCash(event) {
+    event.preventDefault();
+    const amount = Number(document.querySelector("#cashAmount").value);
+    if (!Number.isFinite(amount) || amount <= 0) {
+        showToast("Enter a valid cash amount.");
+        return;
+    }
+
+    const response = await fetch(`${API_URL}/cash`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount })
+    });
+    if (!response.ok) {
+        showToast("Could not add cash.");
+        return;
+    }
+    cashDialog.close();
+    event.target.reset();
+    showToast("Cash added to portfolio.");
+    loadItems();
+}
+
 async function sellItem(id) {
     const holding = state.items.find(item => item.id === id);
     if (!holding) return;
@@ -341,8 +369,11 @@ function showToast(message) { clearTimeout(toastTimer); toast.textContent = mess
 
 document.querySelector("#openAddDialogButton").addEventListener("click", () => dialog.showModal());
 document.querySelector("#emptyAddButton").addEventListener("click", () => dialog.showModal());
+document.querySelector("#addCashButton").addEventListener("click", addCash);
 document.querySelector("#closeDialogButton").addEventListener("click", () => dialog.close());
 document.querySelector("#cancelDialogButton").addEventListener("click", () => dialog.close());
+document.querySelector("#closeCashDialogButton").addEventListener("click", () => cashDialog.close());
+document.querySelector("#cancelCashDialogButton").addEventListener("click", () => cashDialog.close());
 document.querySelector("#closeAiDialogButton").addEventListener("click", () => {
     if (activeAiSource) activeAiSource.close();
     activeAiSource = null;
@@ -359,6 +390,7 @@ aiDialog.addEventListener("close", () => {
     setAiStatus("Analysis closed");
 });
 document.querySelector("#assetForm").addEventListener("submit", saveAsset);
+document.querySelector("#cashForm").addEventListener("submit", saveCash);
 document.querySelector("#assetCatalogId").addEventListener("change", loadPriceOptions);
 document.querySelector("#priceTime").addEventListener("change", updateSelectedMarketPrice);
 document.querySelector("#removeSelectedButton").addEventListener("click", () => state.selectedId ? sellItem(state.selectedId) : showToast("Select a holding row first."));
