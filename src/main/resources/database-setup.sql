@@ -55,7 +55,7 @@ CREATE TABLE IF NOT EXISTS portfolio_value_history (
     UNIQUE KEY uk_portfolio_value_time (record_time)
 );
 
--- 培训价格 API 当前支持的五只股票。SQL 不写假价格，由 MarketPriceService 首次启动时同步。
+-- 股票由培训价格 API 同步；BTC、ETH 由 CoinGecko 同步。SQL 不写假价格。
 INSERT INTO asset_catalog (ticker, asset_name, asset_type) VALUES
     ('AAPL', 'Apple Inc.', 'STOCK'),
     ('TSLA', 'Tesla Inc.', 'STOCK'),
@@ -63,4 +63,6 @@ INSERT INTO asset_catalog (ticker, asset_name, asset_type) VALUES
     ('C', 'Citigroup Inc.', 'STOCK'),
     ('FB', 'Meta Platforms Inc.', 'STOCK'),
     ('CASH', 'Cash', 'CASH')
+    ('BTC', 'Bitcoin', 'CRYPTO'),
+    ('ETH', 'Ethereum', 'CRYPTO')
 ON DUPLICATE KEY UPDATE asset_name = VALUES(asset_name), asset_type = VALUES(asset_type);
