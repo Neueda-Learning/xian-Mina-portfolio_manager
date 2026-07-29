@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 
 public class BuyRequest {
     private Long assetCatalogId;
+    private Long portfolioId;
     private BigDecimal quantity;
     private LocalDateTime priceTime;
 
@@ -14,6 +15,14 @@ public class BuyRequest {
 
     public void setAssetCatalogId(Long assetCatalogId) {
         this.assetCatalogId = assetCatalogId;
+    }
+
+    public Long getPortfolioId() {
+        return portfolioId;
+    }
+
+    public void setPortfolioId(Long portfolioId) {
+        this.portfolioId = portfolioId;
     }
 
     public BigDecimal getQuantity() {
