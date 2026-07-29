@@ -16,22 +16,20 @@ public class PortfolioValueHistoryRepository {
         this.jdbcTemplate = jdbcTemplate;
     }
 
-    public void saveDailyValue(long portfolioId, BigDecimal totalValue) {
-        saveValue(portfolioId, totalValue, LocalDateTime.now());
+    public void saveDailyValue(BigDecimal totalValue) {
+        saveValue(totalValue, LocalDateTime.now());
     }
 
-    public void saveValue(long portfolioId, BigDecimal totalValue, LocalDateTime recordTime) {
-        String sql = "INSERT INTO portfolio_value_history (portfolio_id, total_value, record_time) VALUES (?, ?, ?) "
+    public void saveValue(BigDecimal totalValue, LocalDateTime recordTime) {
+        String sql = "INSERT INTO portfolio_value_history (total_value, record_time) VALUES (?, ?) "
                 + "ON DUPLICATE KEY UPDATE total_value = VALUES(total_value)";
-        jdbcTemplate.update(sql, portfolioId, totalValue, recordTime);
+        jdbcTemplate.update(sql, totalValue, recordTime);
     }
 
-    public List<PortfolioValueHistory> findAll(long portfolioId) {
-        String sql = "SELECT id, portfolio_id, total_value, record_time FROM portfolio_value_history "
-                + "WHERE portfolio_id = ? ORDER BY record_time";
+    public List<PortfolioValueHistory> findAll() {
+        String sql = "SELECT id, total_value, record_time FROM portfolio_value_history ORDER BY record_time";
         return jdbcTemplate.query(sql, (rs, rowNum) -> new PortfolioValueHistory(
-                rs.getLong("id"), rs.getLong("portfolio_id"), rs.getBigDecimal("total_value"),
-                rs.getTimestamp("record_time").toLocalDateTime()
-        ), portfolioId);
+                rs.getLong("id"), rs.getBigDecimal("total_value"), rs.getTimestamp("record_time").toLocalDateTime()
+        ));
     }
 }

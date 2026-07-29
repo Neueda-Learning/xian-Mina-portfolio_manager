@@ -52,9 +52,6 @@ button { cursor: pointer; }
 h1, h2 { margin: 0; letter-spacing: -.6px; }
 h1 { font-size: clamp(25px, 3vw, 34px); }
 h2 { font-size: 19px; }
-.portfolio-switcher { display: flex; align-items: center; gap: 9px; margin-top: 12px; }
-.portfolio-switcher label { color: #8090a8; font-size: 10px; font-weight: 850; letter-spacing: 1px; }
-.portfolio-switcher select { min-width: 190px; border: 1px solid #ccd6e4; border-radius: 6px; padding: 7px 30px 7px 9px; color: var(--navy); background: #fff; font-size: 12px; font-weight: 750; }
 .topbar-actions { display: flex; gap: 10px; }
 .button { border-radius: 7px; padding: 10px 14px; font-size: 14px; font-weight: 750; border: 1px solid transparent; }
 .button-primary { background: var(--blue); color: #fff; box-shadow: 0 4px 12px #1768d533; }
@@ -178,7 +175,6 @@ dialog input:focus, dialog select:focus { outline: 2px solid #1768d544; border-c
     .main-content { padding: 22px 14px 38px; }
     .topbar, .metric-row { align-items: stretch; flex-direction: column; }
     .topbar-actions .button { flex: 1; }
-    .portfolio-switcher { align-items: flex-start; flex-wrap: wrap; }
     .metric-row { gap: 10px; }
     .allocation-content { gap: 22px; flex-direction: column; padding: 18px 0; }
     .allocation-legend { grid-template-columns: repeat(2, minmax(120px, 1fr)); }

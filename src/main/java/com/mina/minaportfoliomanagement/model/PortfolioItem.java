@@ -6,7 +6,6 @@ import java.time.LocalDateTime;
 
 public class PortfolioItem {
     private Long id;
-    private Long portfolioId;
     private Long assetCatalogId;
     private BigDecimal quantity;
     private BigDecimal purchasePrice;
@@ -16,9 +15,8 @@ public class PortfolioItem {
     public PortfolioItem() {
     }
 
-    public PortfolioItem(Long id, Long portfolioId, Long assetCatalogId, BigDecimal quantity, BigDecimal purchasePrice, LocalDateTime purchaseTime, LocalDateTime createdAt) {
+    public PortfolioItem(Long id, Long assetCatalogId, BigDecimal quantity, BigDecimal purchasePrice, LocalDateTime purchaseTime, LocalDateTime createdAt) {
         this.id = id;
-        this.portfolioId = portfolioId;
         this.assetCatalogId = assetCatalogId;
         this.quantity = quantity;
         this.purchasePrice = purchasePrice;
@@ -32,14 +30,6 @@ public class PortfolioItem {
 
     public void setAssetCatalogId(Long assetCatalogId) {
         this.assetCatalogId = assetCatalogId;
-    }
-
-    public Long getPortfolioId() {
-        return portfolioId;
-    }
-
-    public void setPortfolioId(Long portfolioId) {
-        this.portfolioId = portfolioId;
     }
 
     public BigDecimal getQuantity() {
