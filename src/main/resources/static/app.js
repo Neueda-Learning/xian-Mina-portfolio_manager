@@ -322,7 +322,67 @@ function updateSelectedMarketPrice() {
         ? money.format(Number(option.dataset.price)) : "—";
 }
 
-// 折线图读取 portfolio_value_history；暂无两天以上历史时显示当天的平线。
+// 同一天可能有多次市值快照。折线图按天展示，因此只保留当天最后一次快照。
+function getDailyPerformancePoints(totalValue) {
+    const dailyValues = new Map();
+    const sortedHistory = [...state.performance].sort((left, right) =>
+        String(left.recordDate ?? left.recordTime).localeCompare(String(right.recordDate ?? right.recordTime))
+    );
+
+    sortedHistory.forEach(item => {
+        const recordTime = item.recordDate ?? item.recordTime;
+        if (!recordTime) return;
+        dailyValues.set(String(recordTime).slice(0, 10), Number(item.totalValue));
+    });
+
+    const points = [...dailyValues.entries()].map(([day, value]) => ({ day, value }));
+    if (points.length) {
+        // 为首次买入前补 6 天的 0 市值基线；买入后当天开始出现组合市值。
+        // 后续某天没有新快照时，沿用上一天的市值，避免曲线错误地回落到 0。
+        const firstDay = points[0].day;
+        const lastDay = points.at(-1).day;
+        const startDay = addCalendarDays(firstDay, -6);
+        const result = [];
+        let currentValue = 0;
+
+        for (let day = startDay; day <= lastDay; day = addCalendarDays(day, 1)) {
+            if (dailyValues.has(day)) currentValue = dailyValues.get(day);
+            result.push({ day, value: currentValue });
+        }
+        return result;
+    }
+
+    // 还没有数据库记录时，使用今天的 0/当前值作为占位平线。
+    const today = new Date().toISOString().slice(0, 10);
+    return [{ day: today, value: totalValue || 0 }];
+}
+
+// 使用本地日历日期计算，避免 toISOString 的时区转换让日期少一天。
+function addCalendarDays(day, offset) {
+    const [year, month, date] = day.split("-").map(Number);
+    const value = new Date(year, month - 1, date + offset);
+    const yyyy = value.getFullYear();
+    const mm = String(value.getMonth() + 1).padStart(2, "0");
+    const dd = String(value.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+}
+
+function renderPerformanceLabels(points) {
+    const labels = document.querySelector("#performanceLabels");
+    const maxLabels = 7;
+    const labelIndexes = points.length <= maxLabels
+        ? points.map((_, index) => index)
+        : [...new Set(Array.from({ length: maxLabels }, (_, index) =>
+            Math.round(index * (points.length - 1) / (maxLabels - 1))
+        ))];
+
+    labels.innerHTML = labelIndexes.map(index => {
+        const day = points[index].day;
+        return `<span>${escapeHtml(day.slice(5))}</span>`;
+    }).join("");
+}
+
+// 折线图读取 portfolio_value_history，并以数据库记录日期为横轴。
 function drawPerformanceChart(data) {
     const canvas = document.querySelector("#performanceChart");
     const box = canvas.getBoundingClientRect();
@@ -333,8 +393,10 @@ function drawPerformanceChart(data) {
     ctx.scale(ratio, ratio);
     const width = box.width;
     const height = box.height;
-    const storedHistory = state.performance.map(item => Number(item.totalValue));
-    const history = storedHistory.length >= 2 ? storedHistory : [data.totalValue || 0, data.totalValue || 0];
+    const dailyPoints = getDailyPerformancePoints(data.totalValue);
+    const chartPoints = dailyPoints.length >= 2 ? dailyPoints : [dailyPoints[0], dailyPoints[0]];
+    const history = chartPoints.map(item => item.value);
+    renderPerformanceLabels(dailyPoints);
     const min = Math.min(...history) * .97;
     const max = Math.max(...history) * 1.03;
     const padding = { top: 13, right: 10, bottom: 10, left: 45 };
