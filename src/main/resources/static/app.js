@@ -10,6 +10,7 @@ const state = { portfolios: [], activePortfolioId: null, items: [], performance:
 const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 
 const assetDialogs = [...document.querySelectorAll(".asset-dialog")];
+const cashDialog = document.querySelector("#cashDialog");
 const portfolioDialog = document.querySelector("#portfolioDialog");
 const aiDialog = document.querySelector("#aiAnalysisDialog");
 const toast = document.querySelector("#toast");
@@ -81,6 +82,14 @@ function decorateItem(item) {
     return { ...item, quantity, price, currentPrice, costBasis, marketValue, profitLoss: marketValue - costBasis };
 }
 
+function getCashCurrency(item) {
+    if (item.assetType !== "CASH") return "USD";
+    if (typeof item.ticker === "string" && item.ticker.startsWith("CASH_")) {
+        return item.ticker.substring(5).toUpperCase();
+    }
+    return "USD";
+}
+
 function getDashboardData() {
     const items = state.items.map(decorateItem);
     const totalCost = items.reduce((sum, item) => sum + item.costBasis, 0);
@@ -136,10 +145,10 @@ function renderHoldings(items) {
             <td><input class="holding-select" type="radio" name="selectedHolding" value="${item.id}"
                 aria-label="Select ${escapeHtml(item.ticker)} holding" ${item.id === state.selectedId ? "checked" : ""}></td>
             <td><span class="symbol">${escapeHtml(item.ticker)}</span><br><small>${escapeHtml(item.assetName || "Investment asset")}</small></td>
-            <td>${TYPE_META[item.assetType]?.label || item.assetType}</td>
-            <td class="number">${item.quantity}</td>
-            <td class="number">${money.format(item.currentPrice)}</td>
-            <td class="number">${money.format(item.price)}</td>
+            <td>${TYPE_META[item.assetType]?.label || item.assetType}${item.assetType === "CASH" ? ` (${getCashCurrency(item)})` : ""}</td>
+            <td class="number">${item.assetType === "CASH" ? `${item.quantity} ${getCashCurrency(item)}` : item.quantity}</td>
+            <td class="number">${item.assetType === "CASH" ? `${money.format(item.currentPrice)} / ${getCashCurrency(item)}` : money.format(item.currentPrice)}</td>
+            <td class="number">${item.assetType === "CASH" ? `${money.format(item.price)} / ${getCashCurrency(item)}` : money.format(item.price)}</td>
             <td class="number">${money.format(item.marketValue)}</td>
             <td class="number ${item.profitLoss >= 0 ? "profit" : "loss"}">${item.profitLoss >= 0 ? "+" : ""}${money.format(item.profitLoss)}</td>
             <td><button class="remove-row" data-sell-id="${item.id}">Sell</button></td>
@@ -283,6 +292,44 @@ async function saveTypedAsset(event) {
     dialog.close();
     event.currentTarget.reset();
     showToast("Asset purchased successfully.");
+    loadItems();
+}
+
+function addCash() {
+    cashDialog.showModal();
+}
+
+async function saveCash(event) {
+    event.preventDefault();
+    const formData = new FormData(event.target);
+    const amount = Number(formData.get("cashAmount"));
+    const currencyCode = String(formData.get("cashCurrency") || "").trim().toUpperCase();
+    if (!Number.isFinite(amount) || amount <= 0) {
+        showToast("Enter a valid cash amount.");
+        return;
+    }
+    if (!currencyCode) {
+        showToast("Select a currency.");
+        return;
+    }
+
+    const response = await fetch(`${API_URL}/cash`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ portfolioId: state.activePortfolioId, amount, currencyCode })
+    });
+    if (!response.ok) {
+        const message = await response.text();
+        showToast(message || "Could not add cash. Please check FX service and currency.");
+        return;
+    }
+    const createdItem = await response.json();
+    const addedCurrency = createdItem && typeof createdItem.ticker === "string" && createdItem.ticker.startsWith("CASH_")
+        ? createdItem.ticker.substring(5).toUpperCase()
+        : currencyCode;
+    cashDialog.close();
+    event.target.reset();
+    showToast(`Cash added: ${addedCurrency}.`);
     loadItems();
 }
 
@@ -486,6 +533,7 @@ function showToast(message) { clearTimeout(toastTimer); toast.textContent = mess
 document.querySelectorAll("[data-open-asset-dialog]").forEach(button => {
     button.addEventListener("click", () => openAssetDialog(button.dataset.openAssetDialog));
 });
+document.querySelector("#openCashDialogButton").addEventListener("click", addCash);
 assetDialogs.forEach(dialog => {
     const parts = getAssetDialogParts(dialog);
     parts.form.addEventListener("submit", saveTypedAsset);
@@ -496,6 +544,8 @@ assetDialogs.forEach(dialog => {
     });
 });
 document.querySelector("#openPortfolioDialogButton").addEventListener("click", () => portfolioDialog.showModal());
+document.querySelector("#closeCashDialogButton").addEventListener("click", () => cashDialog.close());
+document.querySelector("#cancelCashDialogButton").addEventListener("click", () => cashDialog.close());
 document.querySelector("#closePortfolioDialogButton").addEventListener("click", () => portfolioDialog.close());
 document.querySelector("#cancelPortfolioDialogButton").addEventListener("click", () => portfolioDialog.close());
 document.querySelector("#portfolioSelect").addEventListener("change", event => {
@@ -528,6 +578,7 @@ document.querySelector("#portfolioForm").addEventListener("submit", async event 
     showToast("New portfolio created.");
     loadItems();
 });
+document.querySelector("#cashForm").addEventListener("submit", saveCash);
 document.querySelector("#closeAiDialogButton").addEventListener("click", () => {
     if (activeAiSource) activeAiSource.close();
     activeAiSource = null;
