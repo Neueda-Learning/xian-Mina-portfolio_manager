@@ -73,21 +73,24 @@ public class AssetCatalogRepository {
         return result.stream().findFirst();
     }
 
-    public AssetCatalog ensureCashAsset() {
-        return findByTicker("CASH").orElseGet(() -> {
+    public AssetCatalog ensureCashAsset(String currencyCode) {
+        String normalizedCurrency = currencyCode.toUpperCase();
+        String ticker = "CASH_" + normalizedCurrency;
+        String assetName = "Cash (" + normalizedCurrency + ")";
+        return findByTicker(ticker).orElseGet(() -> {
             org.springframework.jdbc.support.GeneratedKeyHolder keyHolder = new org.springframework.jdbc.support.GeneratedKeyHolder();
             jdbcTemplate.update(connection -> {
                 java.sql.PreparedStatement ps = connection.prepareStatement(
                         "INSERT INTO asset_catalog (ticker, asset_name, asset_type) VALUES (?, ?, ?)",
                         new String[]{"id"}
                 );
-                ps.setString(1, "CASH");
-                ps.setString(2, "Cash");
+                ps.setString(1, ticker);
+                ps.setString(2, assetName);
                 ps.setString(3, "CASH");
                 return ps;
             }, keyHolder);
             Number key = keyHolder.getKey();
-            return new AssetCatalog(key.longValue(), "CASH", "Cash", "CASH");
+            return new AssetCatalog(key.longValue(), ticker, assetName, "CASH");
         });
     }
 }

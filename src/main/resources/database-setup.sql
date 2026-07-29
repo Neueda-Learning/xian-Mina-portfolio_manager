@@ -61,5 +61,6 @@ INSERT INTO asset_catalog (ticker, asset_name, asset_type) VALUES
     ('TSLA', 'Tesla Inc.', 'STOCK'),
     ('AMZN', 'Amazon.com Inc.', 'STOCK'),
     ('C', 'Citigroup Inc.', 'STOCK'),
-    ('FB', 'Meta Platforms Inc.', 'STOCK')
+    ('FB', 'Meta Platforms Inc.', 'STOCK'),
+    ('CASH', 'Cash', 'CASH')
 ON DUPLICATE KEY UPDATE asset_name = VALUES(asset_name), asset_type = VALUES(asset_type);
