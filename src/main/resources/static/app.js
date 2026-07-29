@@ -11,21 +11,11 @@ const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD
 
 const assetDialogs = [...document.querySelectorAll(".asset-dialog")];
 const cashDialog = document.querySelector("#cashDialog");
-const settingsDialog = document.querySelector("#settingsDialog");
 const portfolioDialog = document.querySelector("#portfolioDialog");
 const aiDialog = document.querySelector("#aiAnalysisDialog");
 const toast = document.querySelector("#toast");
 let toastTimer;
 let activeAiSource = null;
-
-function applyTheme(isDarkMode) {
-    document.body.classList.toggle("dark-mode", isDarkMode);
-    document.querySelector("#darkModeToggle").checked = isDarkMode;
-    localStorage.setItem("portfolioTheme", isDarkMode ? "dark" : "light");
-}
-
-// 页面加载时恢复上一次选择的主题。
-applyTheme(localStorage.getItem("portfolioTheme") === "dark");
 
 // 读取所有组合，并恢复上次选择的组合；没有记录时默认选择第一个组合。
 async function loadPortfolios() {
@@ -160,12 +150,8 @@ function renderHoldings(items) {
             <td class="number">${item.assetType === "CASH" ? `${money.format(item.currentPrice)} / ${getCashCurrency(item)}` : money.format(item.currentPrice)}</td>
             <td class="number">${item.assetType === "CASH" ? `${money.format(item.price)} / ${getCashCurrency(item)}` : money.format(item.price)}</td>
             <td class="number">${money.format(item.marketValue)}</td>
-            ${item.assetType === "CASH"
-                ? '<td class="number cash-profit-loss">—</td>'
-                : `<td class="number ${item.profitLoss >= 0 ? "profit" : "loss"}">${item.profitLoss >= 0 ? "+" : ""}${money.format(item.profitLoss)}</td>`}
-            <td>${item.assetType === "CASH"
-                ? `<button class="table-action action-withdraw" data-sell-id="${item.id}">Withdraw</button>`
-                : `<button class="table-action action-sell" data-sell-id="${item.id}">Sell</button>`}</td>
+            <td class="number ${item.profitLoss >= 0 ? "profit" : "loss"}">${item.profitLoss >= 0 ? "+" : ""}${money.format(item.profitLoss)}</td>
+            <td><button class="remove-row" data-sell-id="${item.id}">Sell</button></td>
         </tr>`).join("");
     empty.hidden = items.length !== 0;
     body.querySelectorAll("tr").forEach(row => row.addEventListener("click", () => {
@@ -201,9 +187,8 @@ function renderMarketAssets() {
     body.innerHTML = visibleAssets.map(asset => `
         <tr><td class="symbol">${escapeHtml(asset.ticker)}</td><td>${escapeHtml(asset.assetName)}</td>
         <td>${TYPE_META[asset.assetType]?.label || asset.assetType}</td>
-        <td class="number">${money.format(Number(asset.marketPrice))}</td><td>${asset.priceTime}</td>
-        <td><button class="market-buy-button" type="button" data-buy-asset="${asset.id}">Buy</button></td></tr>`).join("")
-        || '<tr><td class="empty-market-row" colspan="6">No market data is available for this asset type.</td></tr>';
+        <td class="number">${money.format(Number(asset.marketPrice))}</td><td>${asset.priceTime}</td></tr>`).join("")
+        || '<tr><td class="empty-market-row" colspan="5">No market data is available for this asset type.</td></tr>';
     // The old single Add Asset select no longer exists. Keep this guard so the
     // market table still renders while the three typed dialogs manage their own selects.
     if (select) {
@@ -211,12 +196,8 @@ function renderMarketAssets() {
             `<option value="${asset.id}">${escapeHtml(asset.ticker)} — ${escapeHtml(asset.assetName)}</option>`).join("");
         loadPriceOptions();
     }
-    body.querySelectorAll("[data-buy-asset]").forEach(button => {
-        button.addEventListener("click", () => {
-            const asset = state.marketAssets.find(item => item.id === Number(button.dataset.buyAsset));
-            if (asset) openAssetDialog(asset.assetType, asset.id);
-        });
-    });
+    const marketDay = state.marketAssets[0]?.priceTime || "—";
+    document.querySelector("#marketDay").textContent = marketDay;
     renderOpenAssetDialogs();
 }
 
@@ -225,7 +206,6 @@ function getAssetDialogParts(dialog) {
         type: dialog.dataset.assetType,
         form: dialog.querySelector(".asset-form"),
         search: dialog.querySelector(".asset-search"),
-        suggestions: dialog.querySelector(".asset-suggestions"),
         assetSelect: dialog.querySelector(".asset-catalog-id"),
         quantity: dialog.querySelector(".asset-quantity"),
         priceTime: dialog.querySelector(".price-time")
@@ -241,29 +221,20 @@ function assetsForType(type, searchText = "") {
     });
 }
 
-function renderAssetOptions(dialog, showSuggestions = false) {
+function renderAssetOptions(dialog) {
     const parts = getAssetDialogParts(dialog);
     const assets = assetsForType(parts.type, parts.search.value);
-    parts.suggestions.innerHTML = assets.length
-        ? assets.map(asset => `
-            <button class="asset-suggestion" type="button" role="option" data-asset-id="${asset.id}">
-                <strong>${escapeHtml(asset.ticker)}</strong><span>${escapeHtml(asset.assetName)}</span>
-            </button>`).join("")
-        : '<p class="asset-no-result">No matching asset found</p>';
-    parts.suggestions.hidden = !showSuggestions;
-}
-
-function selectSuggestedAsset(dialog, assetId) {
-    const parts = getAssetDialogParts(dialog);
-    const asset = assetsForType(parts.type).find(item => item.id === assetId);
-    if (!asset) return;
-    parts.search.value = `${asset.ticker} — ${asset.assetName}`;
-    parts.assetSelect.value = String(asset.id);
-    parts.suggestions.hidden = true;
+    if (!assets.length) {
+        parts.assetSelect.innerHTML = '<option value="">No matching asset found</option>';
+        parts.priceTime.innerHTML = "";
+        return;
+    }
+    parts.assetSelect.innerHTML = assets.map(asset =>
+        `<option value="${asset.id}">${escapeHtml(asset.ticker)} — ${escapeHtml(asset.assetName)}</option>`).join("");
     loadDialogPriceOptions(dialog);
 }
 
-function openAssetDialog(type, selectedAssetId = null) {
+function openAssetDialog(type) {
     const dialog = document.querySelector(`.asset-dialog[data-asset-type="${type}"]`);
     if (!dialog) return;
     if (!assetsForType(type).length) {
@@ -273,7 +244,6 @@ function openAssetDialog(type, selectedAssetId = null) {
     const parts = getAssetDialogParts(dialog);
     parts.form.reset();
     renderAssetOptions(dialog);
-    if (selectedAssetId) selectSuggestedAsset(dialog, selectedAssetId);
     dialog.showModal();
 }
 
@@ -301,10 +271,7 @@ async function loadDialogPriceOptions(dialog) {
 }
 
 function renderOpenAssetDialogs() {
-    assetDialogs.filter(dialog => dialog.open).forEach(dialog => {
-        const parts = getAssetDialogParts(dialog);
-        renderAssetOptions(dialog, !parts.suggestions.hidden);
-    });
+    assetDialogs.filter(dialog => dialog.open).forEach(renderAssetOptions);
 }
 
 async function saveTypedAsset(event) {
@@ -317,10 +284,6 @@ async function saveTypedAsset(event) {
         quantity: Number(parts.quantity.value),
         priceTime: parts.priceTime.value
     };
-    if (!payload.assetCatalogId) {
-        showToast("Please choose an asset from the search suggestions.");
-        return;
-    }
     const response = await fetch(API_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -406,67 +369,7 @@ function updateSelectedMarketPrice() {
         ? money.format(Number(option.dataset.price)) : "—";
 }
 
-// 同一天可能有多次市值快照。折线图按天展示，因此只保留当天最后一次快照。
-function getDailyPerformancePoints(totalValue) {
-    const dailyValues = new Map();
-    const sortedHistory = [...state.performance].sort((left, right) =>
-        String(left.recordDate ?? left.recordTime).localeCompare(String(right.recordDate ?? right.recordTime))
-    );
-
-    sortedHistory.forEach(item => {
-        const recordTime = item.recordDate ?? item.recordTime;
-        if (!recordTime) return;
-        dailyValues.set(String(recordTime).slice(0, 10), Number(item.totalValue));
-    });
-
-    const points = [...dailyValues.entries()].map(([day, value]) => ({ day, value }));
-    if (points.length) {
-        // 为首次买入前补 6 天的 0 市值基线；买入后当天开始出现组合市值。
-        // 后续某天没有新快照时，沿用上一天的市值，避免曲线错误地回落到 0。
-        const firstDay = points[0].day;
-        const lastDay = points.at(-1).day;
-        const startDay = addCalendarDays(firstDay, -6);
-        const result = [];
-        let currentValue = 0;
-
-        for (let day = startDay; day <= lastDay; day = addCalendarDays(day, 1)) {
-            if (dailyValues.has(day)) currentValue = dailyValues.get(day);
-            result.push({ day, value: currentValue });
-        }
-        return result;
-    }
-
-    // 还没有数据库记录时，使用今天的 0/当前值作为占位平线。
-    const today = new Date().toISOString().slice(0, 10);
-    return [{ day: today, value: totalValue || 0 }];
-}
-
-// 使用本地日历日期计算，避免 toISOString 的时区转换让日期少一天。
-function addCalendarDays(day, offset) {
-    const [year, month, date] = day.split("-").map(Number);
-    const value = new Date(year, month - 1, date + offset);
-    const yyyy = value.getFullYear();
-    const mm = String(value.getMonth() + 1).padStart(2, "0");
-    const dd = String(value.getDate()).padStart(2, "0");
-    return `${yyyy}-${mm}-${dd}`;
-}
-
-function renderPerformanceLabels(points) {
-    const labels = document.querySelector("#performanceLabels");
-    const maxLabels = 7;
-    const labelIndexes = points.length <= maxLabels
-        ? points.map((_, index) => index)
-        : [...new Set(Array.from({ length: maxLabels }, (_, index) =>
-            Math.round(index * (points.length - 1) / (maxLabels - 1))
-        ))];
-
-    labels.innerHTML = labelIndexes.map(index => {
-        const day = points[index].day;
-        return `<span>${escapeHtml(day.slice(5))}</span>`;
-    }).join("");
-}
-
-// 折线图读取 portfolio_value_history，并以数据库记录日期为横轴。
+// 折线图读取 portfolio_value_history；暂无两天以上历史时显示当天的平线。
 function drawPerformanceChart(data) {
     const canvas = document.querySelector("#performanceChart");
     const box = canvas.getBoundingClientRect();
@@ -477,10 +380,8 @@ function drawPerformanceChart(data) {
     ctx.scale(ratio, ratio);
     const width = box.width;
     const height = box.height;
-    const dailyPoints = getDailyPerformancePoints(data.totalValue);
-    const chartPoints = dailyPoints.length >= 2 ? dailyPoints : [dailyPoints[0], dailyPoints[0]];
-    const history = chartPoints.map(item => item.value);
-    renderPerformanceLabels(dailyPoints);
+    const storedHistory = state.performance.map(item => Number(item.totalValue));
+    const history = storedHistory.length >= 2 ? storedHistory : [data.totalValue || 0, data.totalValue || 0];
     const min = Math.min(...history) * .97;
     const max = Math.max(...history) * 1.03;
     const padding = { top: 13, right: 10, bottom: 10, left: 45 };
@@ -641,21 +542,8 @@ document.querySelector("#openCashDialogButton").addEventListener("click", addCas
 assetDialogs.forEach(dialog => {
     const parts = getAssetDialogParts(dialog);
     parts.form.addEventListener("submit", saveTypedAsset);
-    parts.search.addEventListener("focus", () => renderAssetOptions(dialog, true));
-    parts.search.addEventListener("input", () => {
-        // 输入新关键词后，之前选择的资产不再有效，必须重新点选建议项。
-        parts.assetSelect.value = "";
-        parts.priceTime.innerHTML = "";
-        renderAssetOptions(dialog, true);
-    });
-    parts.search.addEventListener("blur", () => {
-        // 给用户点击建议项的时间，随后再收起面板。
-        window.setTimeout(() => { parts.suggestions.hidden = true; }, 150);
-    });
-    parts.suggestions.addEventListener("click", event => {
-        const button = event.target.closest("[data-asset-id]");
-        if (button) selectSuggestedAsset(dialog, Number(button.dataset.assetId));
-    });
+    parts.search.addEventListener("input", () => renderAssetOptions(dialog));
+    parts.assetSelect.addEventListener("change", () => loadDialogPriceOptions(dialog));
     dialog.querySelectorAll(".close-asset-dialog").forEach(button => {
         button.addEventListener("click", () => dialog.close());
     });
@@ -696,10 +584,6 @@ document.querySelector("#portfolioForm").addEventListener("submit", async event 
     loadItems();
 });
 document.querySelector("#cashForm").addEventListener("submit", saveCash);
-document.querySelector("#openSettingsButton").addEventListener("click", () => settingsDialog.showModal());
-document.querySelector("#closeSettingsButton").addEventListener("click", () => settingsDialog.close());
-document.querySelector("#closeSettingsDoneButton").addEventListener("click", () => settingsDialog.close());
-document.querySelector("#darkModeToggle").addEventListener("change", event => applyTheme(event.target.checked));
 document.querySelector("#closeAiDialogButton").addEventListener("click", () => {
     if (activeAiSource) activeAiSource.close();
     activeAiSource = null;
