@@ -1,8 +1,7 @@
 const API_URL = "/api/portfolio-items";
-const TYPE_ORDER = ["STOCK", "BOND", "FUND", "CRYPTO", "CASH"];
+const TYPE_ORDER = ["STOCK", "FUND", "CRYPTO", "CASH"];
 const TYPE_META = {
     STOCK: { label: "Stocks", color: "#1768d5" },
-    BOND: { label: "Bonds", color: "#028b78" },
     FUND: { label: "Funds", color: "#805ad5" },
     CRYPTO: { label: "Crypto", color: "#dc4b58" },
     CASH: { label: "Cash", color: "#eeb547" }
@@ -168,7 +167,10 @@ async function loadPriceOptions() {
         const prices = await response.json();
         priceTimeSelect.innerHTML = prices.map(item => {
             const time = item.priceTime.replace("T", " ");
-            return `<option value="${item.priceTime}" data-price="${item.marketPrice}">${time}</option>`;
+            const selectedAsset = state.marketAssets.find(asset => asset.id === assetId);
+            // 基金只有每日净值，购买时只展示日期；股票、加密货币仍展示具体报价时间。
+            const label = selectedAsset?.assetType === "FUND" ? time.slice(0, 10) : time;
+            return `<option value="${item.priceTime}" data-price="${item.marketPrice}">${label}</option>`;
         }).join("");
         updateSelectedMarketPrice();
     } catch (error) {
