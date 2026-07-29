@@ -19,7 +19,6 @@
             <button class="nav-item" data-scroll-target="market"><span>◈</span>Market Prices</button>
             <button class="nav-item" data-scroll-target="holdings"><span>▤</span>Holdings</button>
             <button class="nav-item" data-scroll-target="performance"><span>⌁</span>Performance</button>
-            <button class="nav-item" id="addCashButton"><span>＋</span>Add Cash</button>
             <button class="nav-item" data-toast="Settings will be available later."><span>⚙</span>Settings</button>
         </nav>
 
@@ -33,8 +32,8 @@
                 <h1>Portfolio Dashboard</h1>
             </div>
             <div class="topbar-actions">
-                <button class="button button-secondary" id="removeSelectedButton">Sell Selected</button>
-                <button class="button button-primary" id="openAddDialogButton">+ Add Asset</button>
+                <button class="button button-secondary" id="addCashButton">+ Add Cash</button>
+                <button class="button button-primary" id="openAddDialogButton">+ Add Stock</button>
             </div>
         </header>
 
@@ -198,7 +197,17 @@
         <label>Amount
             <input id="cashAmount" name="cashAmount" type="number" min="0.01" step="0.01" placeholder="1000" required>
         </label>
-        <p class="form-note">现金会作为 CASH 资产进入组合，按 1.00 计价。</p>
+        <label>Currency
+            <select id="cashCurrency" name="cashCurrency" required>
+                <option value="USD">USD</option>
+                <option value="GBP">GBP</option>
+                <option value="EUR">EUR</option>
+                <option value="CNY">CNY</option>
+                <option value="JPY">JPY</option>
+                <option value="HKD">HKD</option>
+            </select>
+        </label>
+        <p class="form-note">会自动查询汇率并换算成 USD 计入组合（例如 CASH_USD、CASH_GBP 分开存储）。</p>
         <div class="dialog-actions">
             <button type="button" class="button button-secondary" id="cancelCashDialogButton">Cancel</button>
             <button type="submit" class="button button-primary">Add Cash</button>

@@ -13,7 +13,6 @@ import com.mina.minaportfoliomanagement.repository.PortfolioItemRepository;
 import com.mina.minaportfoliomanagement.repository.TradeHistoryRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
@@ -23,19 +22,28 @@ import java.util.List;
 
 @Service
 public class HoldingService {
+    private record SellQuote(BigDecimal price, LocalDateTime time) {}
+
     private final PortfolioItemRepository portfolioItemRepository;
     private final AssetCatalogRepository assetCatalogRepository;
     private final AssetPriceHistoryRepository priceHistoryRepository;
     private final PerformanceService performanceService;
     private final TradeHistoryRepository tradeHistoryRepository;
+    private final CashFxService cashFxService;
 
 
-    public HoldingService(PortfolioItemRepository portfolioItemRepository, AssetCatalogRepository assetCatalogRepository, AssetPriceHistoryRepository priceHistoryRepository, PerformanceService performanceService, TradeHistoryRepository tradeHistoryRepository) {
+    public HoldingService(PortfolioItemRepository portfolioItemRepository,
+                          AssetCatalogRepository assetCatalogRepository,
+                          AssetPriceHistoryRepository priceHistoryRepository,
+                          PerformanceService performanceService,
+                          TradeHistoryRepository tradeHistoryRepository,
+                          CashFxService cashFxService) {
         this.portfolioItemRepository = portfolioItemRepository;
         this.assetCatalogRepository = assetCatalogRepository;
         this.priceHistoryRepository = priceHistoryRepository;
         this.performanceService = performanceService;
         this.tradeHistoryRepository = tradeHistoryRepository;
+        this.cashFxService = cashFxService;
     }
 
     public List<HoldingView> getAllItems() {
@@ -101,15 +109,16 @@ public class HoldingService {
         if (request.getAmount() == null || request.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "amount must be greater than zero");
         }
+        CashFxService.FxQuote fxQuote = cashFxService.getUsdQuote(request.resolveCurrencyCode());
 
-        var cashAsset = assetCatalogRepository.ensureCashAsset();
-        BigDecimal amount = request.getAmount().setScale(2, RoundingMode.HALF_UP);
+        var cashAsset = assetCatalogRepository.ensureCashAsset(fxQuote.currencyCode());
+        BigDecimal amount = request.getAmount().setScale(4, RoundingMode.HALF_UP);
         LocalDateTime now = LocalDateTime.now();
 
         PortfolioItem item = new PortfolioItem();
         item.setAssetCatalogId(cashAsset.getId());
         item.setQuantity(amount);
-        item.setPurchasePrice(BigDecimal.ONE);
+        item.setPurchasePrice(fxQuote.usdRate());
         item.setPurchaseTime(now);
 
         long id;
@@ -117,14 +126,17 @@ public class HoldingService {
         if (existingHolding.isPresent()) {
             PortfolioItem existing = existingHolding.get();
             BigDecimal totalQuantity = existing.getQuantity().add(item.getQuantity());
-            portfolioItemRepository.updateHolding(existing.getId(), totalQuantity, BigDecimal.ONE, now);
+            BigDecimal totalUsdCost = existing.getQuantity().multiply(existing.getPurchasePrice())
+                    .add(item.getQuantity().multiply(item.getPurchasePrice()));
+            BigDecimal averageFxRate = totalUsdCost.divide(totalQuantity, 6, RoundingMode.HALF_UP);
+            portfolioItemRepository.updateHolding(existing.getId(), totalQuantity, averageFxRate, now);
             id = existing.getId();
         } else {
             id = portfolioItemRepository.save(item);
         }
 
         tradeHistoryRepository.save(new TradeHistory(item.getAssetCatalogId(), "DEPOSIT", item.getQuantity(),
-                BigDecimal.ONE, now));
+                item.getPurchasePrice(), now));
         HoldingView result = getItem(id);
         performanceService.recordCurrentPortfolioValue();
         return result;
@@ -139,8 +151,7 @@ public class HoldingService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "sell quantity cannot exceed current holding");
         }
 
-        MarketAssetView marketAsset = priceHistoryRepository.findLatestByAssetId(holding.getAssetCatalogId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "No market price is available"));
+        SellQuote sellQuote = resolveSellQuote(holding);
         BigDecimal remaining = holding.getQuantity().subtract(request.getQuantity());
         if (remaining.compareTo(BigDecimal.ZERO) == 0) {
             portfolioItemRepository.deleteById(id);
@@ -148,8 +159,21 @@ public class HoldingService {
             portfolioItemRepository.updateQuantity(id, remaining);
         }
         tradeHistoryRepository.save(new TradeHistory(holding.getAssetCatalogId(), "SELL", request.getQuantity(),
-                marketAsset.getMarketPrice(), marketAsset.getPriceTime()));
+                sellQuote.price(), sellQuote.time()));
         performanceService.recordCurrentPortfolioValue();
+    }
+
+    private SellQuote resolveSellQuote(HoldingView holding) {
+        if (isCashHolding(holding)) {
+            return new SellQuote(holding.getPurchasePrice(), LocalDateTime.now());
+        }
+        MarketAssetView marketAsset = priceHistoryRepository.findLatestByAssetId(holding.getAssetCatalogId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "No market price is available"));
+        return new SellQuote(marketAsset.getMarketPrice(), marketAsset.getPriceTime());
+    }
+
+    private boolean isCashHolding(HoldingView holding) {
+        return "CASH".equalsIgnoreCase(holding.getAssetType());
     }
 
     public void deleteItem(long id) {
