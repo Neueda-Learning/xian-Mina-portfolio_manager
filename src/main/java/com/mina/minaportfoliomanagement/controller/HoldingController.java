@@ -20,14 +20,13 @@ public class HoldingController {
     }
 
     @GetMapping
-    public List<HoldingView> getAllItems(@RequestParam(required = false) Long portfolioId){
-        return holdingService.getAllItems(portfolioId);
+    public List<HoldingView> getAllItems(){
+        return holdingService.getAllItems();
     }
 
     @GetMapping("/{id}")
-    public HoldingView getItem(@PathVariable long id, @RequestParam(required = false) Long portfolioId){
-        long resolvedPortfolioId = portfolioId == null ? 1L : portfolioId;
-        return holdingService.getItem(id, resolvedPortfolioId);
+    public HoldingView getItem(@PathVariable long id){
+        return holdingService.getItem(id);
     }
 
     @PostMapping
@@ -35,16 +34,20 @@ public class HoldingController {
         return ResponseEntity.status(HttpStatus.CREATED).body(holdingService.createItem(request));
     }
 
+    @PostMapping("/cash")
+    public ResponseEntity<HoldingView> addCash(@RequestBody CashDepositRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(holdingService.addCash(request));
+    }
+
     @PostMapping("/{id}/sell")
-    public ResponseEntity<Void> sellItem(@PathVariable long id, @RequestParam(required = false) Long portfolioId,
-                                         @RequestBody SellRequest request) {
-        holdingService.sellItem(id, portfolioId, request);
+    public ResponseEntity<Void> sellItem(@PathVariable long id, @RequestBody SellRequest request) {
+        holdingService.sellItem(id, request);
         return ResponseEntity.noContent().build();
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteItem(@PathVariable long id, @RequestParam(required = false) Long portfolioId) {
-        holdingService.deleteItem(id, portfolioId);
+    public ResponseEntity<Void> deleteItem(@PathVariable long id) {
+        holdingService.deleteItem(id);
         return ResponseEntity.noContent().build();
     }
 }

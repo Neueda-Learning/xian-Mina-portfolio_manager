@@ -1,71 +1,32 @@
 const API_URL = "/api/portfolio-items";
-const TYPE_ORDER = ["STOCK", "BOND", "CRYPTO", "CASH"];
+const TYPE_ORDER = ["STOCK", "FUND", "CRYPTO", "CASH"];
 const TYPE_META = {
     STOCK: { label: "Stocks", color: "#1768d5" },
-    BOND: { label: "Bonds", color: "#028b78" },
+    FUND: { label: "Funds", color: "#805ad5" },
     CRYPTO: { label: "Crypto", color: "#dc4b58" },
     CASH: { label: "Cash", color: "#eeb547" }
 };
-const state = { portfolios: [], activePortfolioId: null, items: [], performance: [], marketAssets: [], selectedId: null };
+const state = { items: [], performance: [], marketAssets: [], selectedId: null };
 const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 
 const dialog = document.querySelector("#assetDialog");
-const portfolioDialog = document.querySelector("#portfolioDialog");
+const cashDialog = document.querySelector("#cashDialog");
 const aiDialog = document.querySelector("#aiAnalysisDialog");
 const toast = document.querySelector("#toast");
 let toastTimer;
 let activeAiSource = null;
 
-// 读取所有组合，并恢复上次选择的组合；没有记录时默认选择第一个组合。
-async function loadPortfolios() {
-    const response = await fetch("/api/portfolios");
-    if (!response.ok) throw new Error("Unable to load portfolios");
-    state.portfolios = await response.json();
-    const storedId = Number(localStorage.getItem("activePortfolioId"));
-    const canKeepSelection = state.portfolios.some(portfolio => portfolio.id === state.activePortfolioId);
-    const canUseStoredId = state.portfolios.some(portfolio => portfolio.id === storedId);
-    state.activePortfolioId = canKeepSelection ? state.activePortfolioId
-        : (canUseStoredId ? storedId : state.portfolios[0]?.id ?? null);
-    renderPortfolioSelector();
-}
-
-function renderPortfolioSelector() {
-    const select = document.querySelector("#portfolioSelect");
-    select.innerHTML = state.portfolios.map(portfolio =>
-        `<option value="${portfolio.id}">${escapeHtml(portfolio.portfolioName)}</option>`).join("");
-    select.value = String(state.activePortfolioId ?? "");
-    const active = state.portfolios.find(portfolio => portfolio.id === state.activePortfolioId);
-    document.querySelector("#dashboardTitle").textContent = active
-        ? `${active.portfolioName} Dashboard` : "Portfolio Dashboard";
-}
-
-function activePortfolioQuery() {
-    return `portfolioId=${encodeURIComponent(state.activePortfolioId)}`;
-}
-
-// 从后端读取当前组合的持仓、绩效和市场价格；页面只负责显示和计算。
+// 从后端读取真实持仓、市场价格和组合价值历史；页面只负责显示和计算。
 async function loadItems() {
-    if (!state.activePortfolioId) return;
     try {
         const [itemsResponse, performanceResponse, marketResponse] = await Promise.all([
-            fetch(`${API_URL}?${activePortfolioQuery()}`),
-            fetch(`${API_URL}/performance?${activePortfolioQuery()}`),
-            fetch(`${API_URL}/market/assets`)
+            fetch(API_URL), fetch(`${API_URL}/performance`), fetch(`${API_URL}/market/assets`)
         ]);
         if (!itemsResponse.ok || !performanceResponse.ok || !marketResponse.ok) throw new Error("Unable to load holdings");
         state.items = await itemsResponse.json();
         state.performance = await performanceResponse.json();
         state.marketAssets = await marketResponse.json();
         renderDashboard();
-    } catch (error) {
-        showToast("Could not reach the API. Please check Spring Boot is running.");
-    }
-}
-
-async function initializeDashboard() {
-    try {
-        await loadPortfolios();
-        await loadItems();
     } catch (error) {
         showToast("Could not reach the API. Please check Spring Boot is running.");
     }
@@ -79,6 +40,14 @@ function decorateItem(item) {
     const costBasis = quantity * price;
     const marketValue = quantity * currentPrice;
     return { ...item, quantity, price, currentPrice, costBasis, marketValue, profitLoss: marketValue - costBasis };
+}
+
+function getCashCurrency(item) {
+    if (item.assetType !== "CASH") return "USD";
+    if (typeof item.ticker === "string" && item.ticker.startsWith("CASH_")) {
+        return item.ticker.substring(5).toUpperCase();
+    }
+    return "USD";
 }
 
 function getDashboardData() {
@@ -136,10 +105,10 @@ function renderHoldings(items) {
             <td><input class="holding-select" type="radio" name="selectedHolding" value="${item.id}"
                 aria-label="Select ${escapeHtml(item.ticker)} holding" ${item.id === state.selectedId ? "checked" : ""}></td>
             <td><span class="symbol">${escapeHtml(item.ticker)}</span><br><small>${escapeHtml(item.assetName || "Investment asset")}</small></td>
-            <td>${TYPE_META[item.assetType]?.label || item.assetType}</td>
-            <td class="number">${item.quantity}</td>
-            <td class="number">${money.format(item.currentPrice)}</td>
-            <td class="number">${money.format(item.price)}</td>
+            <td>${TYPE_META[item.assetType]?.label || item.assetType}${item.assetType === "CASH" ? ` (${getCashCurrency(item)})` : ""}</td>
+            <td class="number">${item.assetType === "CASH" ? `${item.quantity} ${getCashCurrency(item)}` : item.quantity}</td>
+            <td class="number">${item.assetType === "CASH" ? `${money.format(item.currentPrice)} / ${getCashCurrency(item)}` : money.format(item.currentPrice)}</td>
+            <td class="number">${item.assetType === "CASH" ? `${money.format(item.price)} / ${getCashCurrency(item)}` : money.format(item.price)}</td>
             <td class="number">${money.format(item.marketValue)}</td>
             <td class="number ${item.profitLoss >= 0 ? "profit" : "loss"}">${item.profitLoss >= 0 ? "+" : ""}${money.format(item.profitLoss)}</td>
             <td><button class="remove-row" data-sell-id="${item.id}">Sell</button></td>
@@ -198,7 +167,10 @@ async function loadPriceOptions() {
         const prices = await response.json();
         priceTimeSelect.innerHTML = prices.map(item => {
             const time = item.priceTime.replace("T", " ");
-            return `<option value="${item.priceTime}" data-price="${item.marketPrice}">${time}</option>`;
+            const selectedAsset = state.marketAssets.find(asset => asset.id === assetId);
+            // 基金只有每日净值，购买时只展示日期；股票、加密货币仍展示具体报价时间。
+            const label = selectedAsset?.assetType === "FUND" ? time.slice(0, 10) : time;
+            return `<option value="${item.priceTime}" data-price="${item.marketPrice}">${label}</option>`;
         }).join("");
         updateSelectedMarketPrice();
     } catch (error) {
@@ -259,7 +231,6 @@ function drawPerformanceChart(data) {
 async function saveAsset(event) {
     event.preventDefault();
     const payload = {
-        portfolioId: state.activePortfolioId,
         assetCatalogId: Number(document.querySelector("#assetCatalogId").value),
         quantity: Number(document.querySelector("#quantity").value),
         priceTime: document.querySelector("#priceTime").value
@@ -269,6 +240,44 @@ async function saveAsset(event) {
     dialog.close();
     event.target.reset();
     showToast("Asset purchased at the latest market price.");
+    loadItems();
+}
+
+async function addCash() {
+    cashDialog.showModal();
+}
+
+async function saveCash(event) {
+    event.preventDefault();
+    const formData = new FormData(event.target);
+    const amount = Number(formData.get("cashAmount"));
+    const currencyCode = String(formData.get("cashCurrency") || "").trim().toUpperCase();
+    if (!Number.isFinite(amount) || amount <= 0) {
+        showToast("Enter a valid cash amount.");
+        return;
+    }
+    if (!currencyCode) {
+        showToast("Select a currency.");
+        return;
+    }
+
+    const response = await fetch(`${API_URL}/cash`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount, currencyCode })
+    });
+    if (!response.ok) {
+        const message = await response.text();
+        showToast(message || "Could not add cash. Please check FX service and currency.");
+        return;
+    }
+    const createdItem = await response.json();
+    const addedCurrency = createdItem && typeof createdItem.ticker === "string" && createdItem.ticker.startsWith("CASH_")
+        ? createdItem.ticker.substring(5).toUpperCase()
+        : currencyCode;
+    cashDialog.close();
+    event.target.reset();
+    showToast(`Cash added: ${addedCurrency}.`);
     loadItems();
 }
 
@@ -282,7 +291,7 @@ async function sellItem(id) {
         showToast("Enter a valid sell quantity.");
         return;
     }
-    const response = await fetch(`${API_URL}/${id}/sell?${activePortfolioQuery()}`, {
+    const response = await fetch(`${API_URL}/${id}/sell`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ quantity })
@@ -342,7 +351,7 @@ function startAiAnalysis() {
     setAiStatus("Generating analysis…", "loading");
     renderAiAnalysis();
 
-    const source = new EventSource(`/api/ai-analysis/stream?${activePortfolioQuery()}`);
+    const source = new EventSource("/api/ai-analysis/stream");
     activeAiSource = source;
     source.addEventListener("token", event => {
         aiAnalysisText += event.data;
@@ -382,41 +391,11 @@ function showToast(message) { clearTimeout(toastTimer); toast.textContent = mess
 
 document.querySelector("#openAddDialogButton").addEventListener("click", () => dialog.showModal());
 document.querySelector("#emptyAddButton").addEventListener("click", () => dialog.showModal());
+document.querySelector("#addCashButton").addEventListener("click", addCash);
 document.querySelector("#closeDialogButton").addEventListener("click", () => dialog.close());
 document.querySelector("#cancelDialogButton").addEventListener("click", () => dialog.close());
-document.querySelector("#openPortfolioDialogButton").addEventListener("click", () => portfolioDialog.showModal());
-document.querySelector("#closePortfolioDialogButton").addEventListener("click", () => portfolioDialog.close());
-document.querySelector("#cancelPortfolioDialogButton").addEventListener("click", () => portfolioDialog.close());
-document.querySelector("#portfolioSelect").addEventListener("change", event => {
-    state.activePortfolioId = Number(event.target.value);
-    state.selectedId = null;
-    localStorage.setItem("activePortfolioId", String(state.activePortfolioId));
-    renderPortfolioSelector();
-    loadItems();
-});
-document.querySelector("#portfolioForm").addEventListener("submit", async event => {
-    event.preventDefault();
-    const portfolioName = document.querySelector("#portfolioName").value.trim();
-    const response = await fetch("/api/portfolios", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ portfolioName })
-    });
-    if (!response.ok) {
-        showToast("Could not create portfolio. Choose a different name.");
-        return;
-    }
-    const portfolio = await response.json();
-    state.portfolios.push(portfolio);
-    state.activePortfolioId = portfolio.id;
-    state.selectedId = null;
-    localStorage.setItem("activePortfolioId", String(portfolio.id));
-    renderPortfolioSelector();
-    portfolioDialog.close();
-    event.target.reset();
-    showToast("New portfolio created.");
-    loadItems();
-});
+document.querySelector("#closeCashDialogButton").addEventListener("click", () => cashDialog.close());
+document.querySelector("#cancelCashDialogButton").addEventListener("click", () => cashDialog.close());
 document.querySelector("#closeAiDialogButton").addEventListener("click", () => {
     if (activeAiSource) activeAiSource.close();
     activeAiSource = null;
@@ -433,9 +412,9 @@ aiDialog.addEventListener("close", () => {
     setAiStatus("Analysis closed");
 });
 document.querySelector("#assetForm").addEventListener("submit", saveAsset);
+document.querySelector("#cashForm").addEventListener("submit", saveCash);
 document.querySelector("#assetCatalogId").addEventListener("change", loadPriceOptions);
 document.querySelector("#priceTime").addEventListener("change", updateSelectedMarketPrice);
-document.querySelector("#removeSelectedButton").addEventListener("click", () => state.selectedId ? sellItem(state.selectedId) : showToast("Select a holding row first."));
 document.querySelector("#startAiAnalysisButton").addEventListener("click", startAiAnalysis);
 document.querySelectorAll("[data-scroll-target]").forEach(button => button.addEventListener("click", () => {
     const target = document.querySelector(`#${button.dataset.scrollTarget}`);
@@ -445,6 +424,6 @@ document.querySelectorAll("[data-scroll-target]").forEach(button => button.addEv
 }));
 document.querySelectorAll("[data-toast]").forEach(button => button.addEventListener("click", () => showToast(button.dataset.toast)));
 window.addEventListener("resize", renderDashboard);
-initializeDashboard();
+loadItems();
 // 前端每分钟只读一次本项目后端；价格 API 的五分钟同步由后端定时任务负责。
-setInterval(() => { if (state.activePortfolioId) loadItems(); }, 60_000);
+setInterval(loadItems, 60_000);

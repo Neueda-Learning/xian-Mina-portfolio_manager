@@ -8,29 +8,15 @@ CREATE TABLE IF NOT EXISTS asset_catalog (
     asset_type VARCHAR(20) NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS portfolio (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    portfolio_name VARCHAR(100) NOT NULL UNIQUE,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
-INSERT INTO portfolio (id, portfolio_name) VALUES
-    (1, 'My Portfolio')
-ON DUPLICATE KEY UPDATE portfolio_name = portfolio_name;
-
 -- 当前持仓：同一资产只保留一行；多次买入后的数量和成本由 HoldingService 合并。
 CREATE TABLE IF NOT EXISTS portfolio_item (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    portfolio_id BIGINT NOT NULL,
     asset_catalog_id BIGINT NOT NULL,
     quantity DECIMAL(15, 4) NOT NULL,
     purchase_price DECIMAL(15, 2) NOT NULL,
     purchase_time DATETIME NOT NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY uk_portfolio_asset (portfolio_id, asset_catalog_id),
-    KEY idx_holding_asset (asset_catalog_id),
-    CONSTRAINT fk_holding_portfolio FOREIGN KEY (portfolio_id)
-        REFERENCES portfolio(id),
+    UNIQUE KEY uk_portfolio_asset (asset_catalog_id),
     CONSTRAINT fk_holding_asset FOREIGN KEY (asset_catalog_id)
         REFERENCES asset_catalog(id)
 );
@@ -50,15 +36,12 @@ CREATE TABLE IF NOT EXISTS asset_price_history (
 -- 每次买入或卖出都保留流水；即使当前持仓卖完，记录也不会删除。
 CREATE TABLE IF NOT EXISTS trade_history (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    portfolio_id BIGINT NOT NULL,
     asset_catalog_id BIGINT NOT NULL,
     trade_type VARCHAR(10) NOT NULL,
     quantity DECIMAL(15, 4) NOT NULL,
     trade_price DECIMAL(15, 2) NOT NULL,
     trade_time DATETIME NOT NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_trade_portfolio FOREIGN KEY (portfolio_id)
-        REFERENCES portfolio(id),
     CONSTRAINT fk_trade_asset FOREIGN KEY (asset_catalog_id)
         REFERENCES asset_catalog(id)
 );
@@ -66,13 +49,10 @@ CREATE TABLE IF NOT EXISTS trade_history (
 -- 组合每个行情时间点的总市值，后续用于 Dashboard 折线图。
 CREATE TABLE IF NOT EXISTS portfolio_value_history (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    portfolio_id BIGINT NOT NULL,
     total_value DECIMAL(15, 2) NOT NULL,
     record_time DATETIME NOT NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY uk_portfolio_value_time (portfolio_id, record_time),
-    CONSTRAINT fk_portfolio_value_portfolio FOREIGN KEY (portfolio_id)
-        REFERENCES portfolio(id)
+    UNIQUE KEY uk_portfolio_value_time (record_time)
 );
 
 -- 股票由培训价格 API 同步；BTC、ETH 由 CoinGecko 同步。SQL 不写假价格。

@@ -6,7 +6,6 @@ import java.time.LocalDateTime;
 public class TradeHistory {
 
     private Long assetCatalogId;
-    private Long portfolioId;
     private String tradeType;
     private BigDecimal quantity;
     private BigDecimal tradePrice;
@@ -15,9 +14,8 @@ public class TradeHistory {
     public TradeHistory() {
     }
 
-    public TradeHistory(Long assetCatalogId, Long portfolioId, String tradeType, BigDecimal quantity, BigDecimal tradePrice, LocalDateTime tradeTime) {
+    public TradeHistory(Long assetCatalogId, String tradeType, BigDecimal quantity, BigDecimal tradePrice, LocalDateTime tradeTime) {
         this.assetCatalogId = assetCatalogId;
-        this.portfolioId = portfolioId;
         this.tradeType = tradeType;
         this.quantity = quantity;
         this.tradePrice = tradePrice;
@@ -26,10 +24,6 @@ public class TradeHistory {
 
     public Long getAssetCatalogId() {
         return assetCatalogId;
-    }
-
-    public Long getPortfolioId() {
-        return portfolioId;
     }
 
     public String getTradeType() {

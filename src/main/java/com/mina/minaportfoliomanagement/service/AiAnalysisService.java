@@ -32,7 +32,6 @@ public class AiAnalysisService {
 
     private final PortfolioItemRepository portfolioItemRepository;
     private final AssetCatalogRepository assetCatalogRepository;
-    private final PortfolioService portfolioService;
     private final HttpClient httpClient;
 
     @Value("${deepseek.api-key:}")
@@ -42,17 +41,15 @@ public class AiAnalysisService {
     @Value("${deepseek.model:deepseek-v4-flash}")
     private String model;
 
-    public AiAnalysisService(PortfolioItemRepository portfolioItemRepository, AssetCatalogRepository assetCatalogRepository,
-                             PortfolioService portfolioService) {
+    public AiAnalysisService(PortfolioItemRepository portfolioItemRepository, AssetCatalogRepository assetCatalogRepository) {
         this.portfolioItemRepository = portfolioItemRepository;
         //this.portfolioItemRepository = portfolioItemRepository;
         this.assetCatalogRepository = assetCatalogRepository;
-        this.portfolioService = portfolioService;
         this.httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
     }
 
     /** 在独立线程中请求模型，避免阻塞 Spring MVC 的请求线程。 */
-    public void streamAnalysis(Long portfolioId, SseEmitter emitter) {
+    public void streamAnalysis(SseEmitter emitter) {
         if (apiKey == null || apiKey.isBlank()) {
             sendEvent(emitter, "ai-error", "未配置 DEEPSEEK_API_KEY，无法调用 AI 分析。");
             emitter.complete();
@@ -60,7 +57,7 @@ public class AiAnalysisService {
         }
 
         try {
-            String requestBody = buildRequestBody(portfolioService.requirePortfolioId(portfolioId));
+            String requestBody = buildRequestBody();
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(baseUrl + "/chat/completions"))
                     .timeout(Duration.ofSeconds(90))
@@ -102,17 +99,17 @@ public class AiAnalysisService {
         }
     }
     /** 将本地数据放入提示词；模型只能根据这些内容分析，不能编造价格。 */
-    private String buildRequestBody(long portfolioId) {
+    private String buildRequestBody() {
         String systemPrompt = "你是培训项目中的投资组合分析助手。只根据提供的数据分析，不提供保证收益、买卖指令或虚构数据。"
                 + "必须使用中文，并严格按以下四个 Markdown 标题输出，每个标题下最多三条简短要点："
                 + "## 市场概览\n## 持仓分析\n## 风险提示\n## 操作结论\n"
                 + "操作结论只能给出学习用途的观察建议，必须包含‘仅供学习，不构成投资建议’。";
 
-        List<HoldingView> holdings = portfolioItemRepository.findAll(portfolioId);
+        List<HoldingView> holdings = portfolioItemRepository.findAll();
         List<MarketAssetView> marketAssets = assetCatalogRepository.findAllWithLatestPrice();
-        String userData =
-                "当前持仓：\n" + buildHoldingText(holdings)
-                        + "\n最新市场行情：\n" + buildMarketText(marketAssets);
+       String userData =
+               "当前持仓：\n" + buildHoldingText(holdings)
+                 + "\n最新市场行情：\n" + buildMarketText(marketAssets);
 
         return "{"
                 + "\"model\":\"" + escapeJson(model) + "\","
