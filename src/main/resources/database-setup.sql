@@ -82,6 +82,8 @@ INSERT INTO asset_catalog (ticker, asset_name, asset_type) VALUES
     ('AMZN', 'Amazon.com Inc.', 'STOCK'),
     ('C', 'Citigroup Inc.', 'STOCK'),
     ('FB', 'Meta Platforms Inc.', 'STOCK'),
+    ('CASH', 'Cash', 'CASH')
     ('BTC', 'Bitcoin', 'CRYPTO'),
-    ('ETH', 'Ethereum', 'CRYPTO')
+    ('ETH', 'Ethereum', 'CRYPTO'),
+    ('FXAIX', 'Fidelity 500 Index Fund', 'FUND')
 ON DUPLICATE KEY UPDATE asset_name = VALUES(asset_name), asset_type = VALUES(asset_type);

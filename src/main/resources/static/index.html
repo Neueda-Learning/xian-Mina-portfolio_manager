@@ -10,8 +10,8 @@
 <div class="app-shell">
     <aside class="sidebar">
         <div class="brand">
-            <span class="brand-mark">PM</span>
-            <span>Portfolio<br>Manager</span>
+            <span class="brand-mark">M </span>
+            <span>Mina</span>
         </div>
 
         <nav class="nav-menu" aria-label="主导航">
@@ -32,8 +32,8 @@
                 <h1>Portfolio Dashboard</h1>
             </div>
             <div class="topbar-actions">
-                <button class="button button-secondary" id="removeSelectedButton">Sell Selected</button>
-                <button class="button button-primary" id="openAddDialogButton">+ Add Asset</button>
+                <button class="button button-secondary" id="addCashButton">+ Add Cash</button>
+                <button class="button button-primary" id="openAddDialogButton">+ Add Stock</button>
             </div>
         </header>
 
@@ -181,6 +181,36 @@
         <div class="dialog-actions">
             <button type="button" class="button button-secondary" id="cancelDialogButton">Cancel</button>
             <button type="submit" class="button button-primary">Save Asset</button>
+        </div>
+    </form>
+</dialog>
+
+<dialog id="cashDialog">
+    <form method="dialog" id="cashForm">
+        <div class="dialog-heading">
+            <div>
+                <p class="eyebrow">ADD CASH</p>
+                <h2>Deposit Cash</h2>
+            </div>
+            <button class="icon-button" type="button" id="closeCashDialogButton" aria-label="关闭">×</button>
+        </div>
+        <label>Amount
+            <input id="cashAmount" name="cashAmount" type="number" min="0.01" step="0.01" placeholder="1000" required>
+        </label>
+        <label>Currency
+            <select id="cashCurrency" name="cashCurrency" required>
+                <option value="USD">USD</option>
+                <option value="GBP">GBP</option>
+                <option value="EUR">EUR</option>
+                <option value="CNY">CNY</option>
+                <option value="JPY">JPY</option>
+                <option value="HKD">HKD</option>
+            </select>
+        </label>
+        <p class="form-note">会自动查询汇率并换算成 USD 计入组合（例如 CASH_USD、CASH_GBP 分开存储）。</p>
+        <div class="dialog-actions">
+            <button type="button" class="button button-secondary" id="cancelCashDialogButton">Cancel</button>
+            <button type="submit" class="button button-primary">Add Cash</button>
         </div>
     </form>
 </dialog>

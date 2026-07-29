@@ -24,7 +24,7 @@ public class AssetCatalogRepository {
                 + "FROM asset_catalog a JOIN asset_price_history p ON p.id = ("
                 + "SELECT latest.id FROM asset_price_history latest WHERE latest.asset_catalog_id = a.id "
                 + "ORDER BY latest.price_time DESC, latest.id DESC LIMIT 1) "
-                + "WHERE a.asset_type IN ('STOCK', 'CRYPTO') ORDER BY a.asset_type, a.ticker";
+                + "WHERE a.asset_type IN ('STOCK', 'CRYPTO', 'FUND') ORDER BY a.asset_type, a.ticker";
 
         return jdbcTemplate.query(sql, (resultSet, rowNum) -> new MarketAssetView(
                 resultSet.getLong("id"),
@@ -62,10 +62,34 @@ public class AssetCatalogRepository {
         ));
     }
 
+    /** 查询由 Twelve Data 同步日净值的基金。 */
+    public List<AssetCatalog> findAllFunds() {
+        String sql = "SELECT id, ticker, asset_name, asset_type FROM asset_catalog "
+                + "WHERE asset_type = 'FUND' ORDER BY ticker";
+
+        return jdbcTemplate.query(sql, (resultSet, rowNum) -> new AssetCatalog(
+                resultSet.getLong("id"),
+                resultSet.getString("ticker"),
+                resultSet.getString("asset_name"),
+                resultSet.getString("asset_type")
+        ));
+    }
+
     /** 为已运行过的旧数据库补充 BTC、ETH，不要求用户手工清库。 */
     public void ensureCryptoAssets() {
         String sql = "INSERT INTO asset_catalog (ticker, asset_name, asset_type) VALUES "
                 + "('BTC', 'Bitcoin', 'CRYPTO'), ('ETH', 'Ethereum', 'CRYPTO') "
+                + "ON DUPLICATE KEY UPDATE asset_name = VALUES(asset_name), asset_type = VALUES(asset_type)";
+        jdbcTemplate.update(sql);
+    }
+
+    /**
+     * 为已运行过的旧数据库补充已验证的基金资产。
+     * ON DUPLICATE KEY 保证项目每次启动都不会插入重复数据。
+     */
+    public void ensureFundAssets() {
+        String sql = "INSERT INTO asset_catalog (ticker, asset_name, asset_type) VALUES "
+                + "('FXAIX', 'Fidelity 500 Index Fund', 'FUND') "
                 + "ON DUPLICATE KEY UPDATE asset_name = VALUES(asset_name), asset_type = VALUES(asset_type)";
         jdbcTemplate.update(sql);
     }
@@ -81,5 +105,37 @@ public class AssetCatalogRepository {
                 resultSet.getString("asset_type")
         ), id);
         return result.stream().findFirst();
+    }
+
+    public Optional<AssetCatalog> findByTicker(String ticker) {
+        String sql = "SELECT id, ticker, asset_name, asset_type FROM asset_catalog WHERE ticker = ?";
+        List<AssetCatalog> result = jdbcTemplate.query(sql, (resultSet, rowNum) -> new AssetCatalog(
+                resultSet.getLong("id"),
+                resultSet.getString("ticker"),
+                resultSet.getString("asset_name"),
+                resultSet.getString("asset_type")
+        ), ticker);
+        return result.stream().findFirst();
+    }
+
+    public AssetCatalog ensureCashAsset(String currencyCode) {
+        String normalizedCurrency = currencyCode.toUpperCase();
+        String ticker = "CASH_" + normalizedCurrency;
+        String assetName = "Cash (" + normalizedCurrency + ")";
+        return findByTicker(ticker).orElseGet(() -> {
+            org.springframework.jdbc.support.GeneratedKeyHolder keyHolder = new org.springframework.jdbc.support.GeneratedKeyHolder();
+            jdbcTemplate.update(connection -> {
+                java.sql.PreparedStatement ps = connection.prepareStatement(
+                        "INSERT INTO asset_catalog (ticker, asset_name, asset_type) VALUES (?, ?, ?)",
+                        new String[]{"id"}
+                );
+                ps.setString(1, ticker);
+                ps.setString(2, assetName);
+                ps.setString(3, "CASH");
+                return ps;
+            }, keyHolder);
+            Number key = keyHolder.getKey();
+            return new AssetCatalog(key.longValue(), ticker, assetName, "CASH");
+        });
     }
 }

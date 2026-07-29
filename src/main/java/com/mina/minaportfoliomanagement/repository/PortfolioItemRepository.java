@@ -20,9 +20,9 @@ public class PortfolioItemRepository {
 
     private String selectHoldingSql() {
         //子查询取该资产最新的市场价格。
-        return "SELECT p.id, p.portfolio_id, p.asset_catalog_id, a.ticker, a.asset_name, a.asset_type, p.quantity, p.purchase_price, p.created_at, "
-                + "latest_price.market_price FROM portfolio_item p JOIN asset_catalog a ON a.id = p.asset_catalog_id "
-                + "JOIN asset_price_history latest_price ON latest_price.id = ("
+        return "SELECT p.id, p.asset_catalog_id, a.ticker, a.asset_name, a.asset_type, p.quantity, p.purchase_price, p.created_at, "
+                + "COALESCE(latest_price.market_price, p.purchase_price) AS market_price FROM portfolio_item p JOIN asset_catalog a ON a.id = p.asset_catalog_id "
+                + "LEFT JOIN asset_price_history latest_price ON latest_price.id = ("
                 + "SELECT ph.id FROM asset_price_history ph WHERE ph.asset_catalog_id = a.id "
                 + "ORDER BY ph.price_time DESC, ph.id DESC LIMIT 1)";
     }

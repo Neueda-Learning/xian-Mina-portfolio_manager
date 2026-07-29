@@ -15,7 +15,7 @@ public class PerformanceRepository {
     public BigDecimal calculateCurrentPortfolioValue(long portfolioId) {
         String sql = "SELECT COALESCE(SUM(p.quantity * latest_price.market_price), 0) AS total_market_value "
                 + "FROM portfolio_item p "
-                + "JOIN asset_price_history latest_price ON latest_price.id = ("
+                + "LEFT JOIN asset_price_history latest_price ON latest_price.id = ("
                 + "SELECT ph.id FROM asset_price_history ph WHERE ph.asset_catalog_id = p.asset_catalog_id "
                 + "ORDER BY ph.price_time DESC, ph.id DESC LIMIT 1) "
                 + "WHERE p.portfolio_id = ?";
