@@ -37,8 +37,13 @@
                 </div>
             </div>
             <div class="topbar-actions">
-                <button class="button button-secondary" id="removeSelectedButton">Sell Selected</button>
-                <button class="button button-primary" id="openAddDialogButton">+ Add Asset</button>
+                <div class="asset-add-actions" aria-label="Add a new asset">
+                    <button class="button button-primary" type="button" data-open-asset-dialog="STOCK">+ Add Stocks</button>
+                    <button class="button button-primary" type="button" data-open-asset-dialog="FUND">+ Add Funds</button>
+                    <button class="button button-primary" type="button" data-open-asset-dialog="CRYPTO">+ Add Crypto</button>
+                    <!-- Cash is intentionally reserved for the teammate who owns the cash feature. -->
+                    <button class="button button-secondary" type="button" id="openCashDialogButton" disabled title="Cash purchase is coming soon">+ Add Cash</button>
+                </div>
             </div>
         </header>
 
@@ -60,7 +65,42 @@
             </article>
         </section>
 
+        <section class="value-grid" id="assetValueCards"></section>
+
         <p class="estimate-note">当前没有持仓时，组合指标为 0；下方仍会展示 API 同步的可交易股票与最新价格。</p>
+
+        <section class="panel holdings-panel" id="holdings">
+            <div class="panel-heading">
+                <div>
+                    <p class="eyebrow">CURRENT ASSETS</p>
+                    <h2>Your Holdings</h2>
+                </div>
+            </div>
+            <p class="holding-help">在左侧单选框选择一笔持仓，点击 Sell 后输入卖出数量；成交价由最新市场行情决定。</p>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                    <tr>
+                        <th aria-label="选择持仓"></th>
+                        <th>Symbol</th>
+                        <th>Asset Type</th>
+                        <th>Shares</th>
+                        <th>Current Price*</th>
+                        <th>Cost Basis</th>
+                        <th>Market Value</th>
+                        <th>P/L</th>
+                        <th>Action</th>
+                    </tr>
+                    </thead>
+                    <tbody id="holdingsBody"></tbody>
+                </table>
+            </div>
+            <div class="empty-state" id="emptyState" hidden>
+                <strong>There are no holdings yet.</strong>
+                <span>Add your first investment to the portfolio.</span>
+                <button class="button button-primary" type="button" data-open-asset-dialog="STOCK">+ Add Stock</button>
+            </div>
+        </section>
 
         <section class="panel market-panel" id="market">
             <div class="panel-heading">
@@ -127,65 +167,83 @@
             </article>
         </section>
 
-        <section class="panel holdings-panel" id="holdings">
-            <div class="panel-heading">
-                <div>
-                    <p class="eyebrow">CURRENT ASSETS</p>
-                    <h2>Your Holdings</h2>
-                </div>
-            </div>
-            <p class="holding-help">在左侧单选框选择一笔持仓，点击 Sell 后输入卖出数量；成交价由最新市场行情决定。</p>
-            <div class="table-wrapper">
-                <table>
-                    <thead>
-                    <tr>
-                        <th aria-label="选择持仓"></th>
-                        <th>Symbol</th>
-                        <th>Asset Type</th>
-                        <th>Shares</th>
-                        <th>Current Price*</th>
-                        <th>Cost Basis</th>
-                        <th>Market Value</th>
-                        <th>P/L</th>
-                        <th>Action</th>
-                    </tr>
-                    </thead>
-                    <tbody id="holdingsBody"></tbody>
-                </table>
-            </div>
-            <div class="empty-state" id="emptyState" hidden>
-                <strong>There are no holdings yet.</strong>
-                <span>Add your first investment to the portfolio.</span>
-                <button class="button button-primary" id="emptyAddButton">+ Add Asset</button>
-            </div>
-        </section>
-
-        <section class="value-grid" id="assetValueCards"></section>
     </main>
 </div>
 
-<dialog id="assetDialog">
-    <form method="dialog" id="assetForm">
+<dialog class="asset-dialog" id="stockAssetDialog" data-asset-type="STOCK">
+    <form method="dialog" class="asset-form">
         <div class="dialog-heading">
             <div>
                 <p class="eyebrow">NEW HOLDING</p>
-                <h2>Add Asset</h2>
+                <h2>Add Stock</h2>
             </div>
-            <button class="icon-button" type="button" id="closeDialogButton" aria-label="关闭">×</button>
+            <button class="icon-button close-asset-dialog" type="button" aria-label="Close">×</button>
         </div>
+        <label>Search Stock
+            <input class="asset-search" type="search" placeholder="Search ticker or name, e.g. AAPL">
+        </label>
         <label>Available Asset
-            <select id="assetCatalogId" name="assetCatalogId" required></select>
+            <select class="asset-catalog-id" required></select>
         </label>
         <label>Quantity
-            <input id="quantity" name="quantity" type="number" min="0.0001" step="0.0001" placeholder="10" required>
+            <input class="asset-quantity" type="number" min="0.0001" step="0.0001" placeholder="10" required>
         </label>
         <label>Purchase Time
-            <select id="priceTime" name="priceTime" required></select>
+            <select class="price-time" required></select>
         </label>
-        <p class="form-note">Buy price: <strong id="selectedMarketPrice">—</strong>. Select a historical API time; the server looks up its real price and records the trade.</p>
         <div class="dialog-actions">
-            <button type="button" class="button button-secondary" id="cancelDialogButton">Cancel</button>
-            <button type="submit" class="button button-primary">Save Asset</button>
+            <button type="button" class="button button-secondary close-asset-dialog">Cancel</button>
+            <button type="submit" class="button button-primary">Save Stock</button>
+        </div>
+    </form>
+</dialog>
+
+<dialog class="asset-dialog" id="fundAssetDialog" data-asset-type="FUND">
+    <form method="dialog" class="asset-form">
+        <div class="dialog-heading">
+            <div><p class="eyebrow">NEW HOLDING</p><h2>Add Fund</h2></div>
+            <button class="icon-button close-asset-dialog" type="button" aria-label="Close">×</button>
+        </div>
+        <label>Search Fund
+            <input class="asset-search" type="search" placeholder="Search fund code or name, e.g. FXAIX">
+        </label>
+        <label>Available Fund
+            <select class="asset-catalog-id" required></select>
+        </label>
+        <label>Quantity
+            <input class="asset-quantity" type="number" min="0.0001" step="0.0001" placeholder="10" required>
+        </label>
+        <label>Purchase Time
+            <select class="price-time" required></select>
+        </label>
+        <div class="dialog-actions">
+            <button type="button" class="button button-secondary close-asset-dialog">Cancel</button>
+            <button type="submit" class="button button-primary">Save Fund</button>
+        </div>
+    </form>
+</dialog>
+
+<dialog class="asset-dialog" id="cryptoAssetDialog" data-asset-type="CRYPTO">
+    <form method="dialog" class="asset-form">
+        <div class="dialog-heading">
+            <div><p class="eyebrow">NEW HOLDING</p><h2>Add Crypto</h2></div>
+            <button class="icon-button close-asset-dialog" type="button" aria-label="Close">×</button>
+        </div>
+        <label>Search Crypto
+            <input class="asset-search" type="search" placeholder="Search code or name, e.g. BTC">
+        </label>
+        <label>Available Crypto
+            <select class="asset-catalog-id" required></select>
+        </label>
+        <label>Quantity
+            <input class="asset-quantity" type="number" min="0.0001" step="0.0001" placeholder="0.01" required>
+        </label>
+        <label>Purchase Time
+            <select class="price-time" required></select>
+        </label>
+        <div class="dialog-actions">
+            <button type="button" class="button button-secondary close-asset-dialog">Cancel</button>
+            <button type="submit" class="button button-primary">Save Crypto</button>
         </div>
     </form>
 </dialog>
