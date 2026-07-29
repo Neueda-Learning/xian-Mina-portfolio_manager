@@ -98,6 +98,11 @@ code { background: #edf1f7; border-radius: 3px; padding: 1px 4px; }
 .market-day { color: #617089; font-size: 12px; font-weight: 700; }
 .market-day strong { color: var(--navy); }
 .market-help { color: #75839a; font-size: 12px; margin: 13px 0 0; }
+.market-type-filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 15px 0 3px; }
+.market-filter { border: 1px solid #d6dfeb; border-radius: 999px; padding: 7px 13px; background: #fff; color: #62728a; font-size: 12px; font-weight: 750; }
+.market-filter:hover { background: #f2f6fc; color: #1768d5; }
+.market-filter.is-active { border-color: #1768d5; background: #1768d5; color: #fff; box-shadow: 0 3px 8px #1768d52b; }
+.empty-market-row { padding: 22px; color: #8290a3; text-align: center; }
 
 .ai-panel { margin-top: 18px; overflow: hidden; }
 .ai-heading { display: flex; align-items: center; justify-content: space-between; gap: 18px; }

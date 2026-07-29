@@ -113,6 +113,12 @@
                 </div>
             </div>
             <p class="market-help">后端在启动时和每天早上同步 API 的整段五分钟行情；页面每分钟刷新显示。买入时可选择历史时间，卖出按最新价格成交。</p>
+            <div class="market-type-filters" role="group" aria-label="Filter available assets by type">
+                <button class="market-filter is-active" type="button" data-market-filter="ALL">All</button>
+                <button class="market-filter" type="button" data-market-filter="STOCK">Stocks</button>
+                <button class="market-filter" type="button" data-market-filter="FUND">Funds</button>
+                <button class="market-filter" type="button" data-market-filter="CRYPTO">Crypto</button>
+            </div>
             <div class="table-wrapper">
                 <table>
                     <thead><tr><th>Symbol</th><th>Asset Name</th><th>Type</th><th>Market Price</th><th>Price Time</th></tr></thead>

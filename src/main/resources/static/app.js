@@ -1,12 +1,12 @@
 const API_URL = "/api/portfolio-items";
-const TYPE_ORDER = ["STOCK", "BOND", "CRYPTO", "CASH"];
+const TYPE_ORDER = ["STOCK", "FUND", "CRYPTO", "CASH"];
 const TYPE_META = {
     STOCK: { label: "Stocks", color: "#1768d5" },
-    BOND: { label: "Bonds", color: "#028b78" },
+    FUND: { label: "Funds", color: "#805ad5" },
     CRYPTO: { label: "Crypto", color: "#dc4b58" },
     CASH: { label: "Cash", color: "#eeb547" }
 };
-const state = { portfolios: [], activePortfolioId: null, items: [], performance: [], marketAssets: [], selectedId: null };
+const state = { portfolios: [], activePortfolioId: null, items: [], performance: [], marketAssets: [], selectedId: null, marketFilter: "ALL" };
 const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 
 const assetDialogs = [...document.querySelectorAll(".asset-dialog")];
@@ -172,10 +172,14 @@ function renderValueCards(allocations) {
 function renderMarketAssets() {
     const body = document.querySelector("#marketBody");
     const select = document.querySelector("#assetCatalogId");
-    body.innerHTML = state.marketAssets.map(asset => `
+    const visibleAssets = state.marketFilter === "ALL"
+        ? state.marketAssets
+        : state.marketAssets.filter(asset => asset.assetType === state.marketFilter);
+    body.innerHTML = visibleAssets.map(asset => `
         <tr><td class="symbol">${escapeHtml(asset.ticker)}</td><td>${escapeHtml(asset.assetName)}</td>
         <td>${TYPE_META[asset.assetType]?.label || asset.assetType}</td>
-        <td class="number">${money.format(Number(asset.marketPrice))}</td><td>${asset.priceTime}</td></tr>`).join("");
+        <td class="number">${money.format(Number(asset.marketPrice))}</td><td>${asset.priceTime}</td></tr>`).join("")
+        || '<tr><td class="empty-market-row" colspan="5">No market data is available for this asset type.</td></tr>';
     // The old single Add Asset select no longer exists. Keep this guard so the
     // market table still renders while the three typed dialogs manage their own selects.
     if (select) {
@@ -280,10 +284,11 @@ async function saveTypedAsset(event) {
         showToast("Could not save asset. Please check the values.");
         return;
     }
+    // 等待当前组合重新读取并渲染完成，避免用户必须手动刷新页面才能看到新持仓。
+    await loadItems();
     dialog.close();
     event.currentTarget.reset();
     showToast("Asset purchased successfully.");
-    loadItems();
 }
 
 // 根据当前选中的股票读取全部五分钟历史价格，供用户选择买入时点。
@@ -544,6 +549,15 @@ aiDialog.addEventListener("close", () => {
     setAiStatus("Analysis closed");
 });
 document.querySelector("#startAiAnalysisButton").addEventListener("click", startAiAnalysis);
+document.querySelectorAll("[data-market-filter]").forEach(button => {
+    button.addEventListener("click", () => {
+        state.marketFilter = button.dataset.marketFilter;
+        document.querySelectorAll("[data-market-filter]").forEach(item => {
+            item.classList.toggle("is-active", item === button);
+        });
+        renderMarketAssets();
+    });
+});
 document.querySelectorAll("[data-scroll-target]").forEach(button => button.addEventListener("click", () => {
     const target = document.querySelector(`#${button.dataset.scrollTarget}`);
     if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
