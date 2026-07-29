@@ -130,8 +130,10 @@ public class MarketPriceService {
 
         try {
             for (AssetCatalog asset : assetCatalogRepository.findAllFunds()) {
-                MarketQuote quote = twelveDataApiClient.getLatestFundQuote(asset.getTicker());
-                priceHistoryRepository.savePrices(asset.getId(), List.of(quote));
+                // Twelve Data 返回最近 30 个交易日；重复日期会由数据库唯一键自动更新。
+                List<MarketQuote> quotes = twelveDataApiClient.getFundPriceHistory(asset.getTicker());
+                priceHistoryRepository.savePrices(asset.getId(), quotes);
+                logger.info("Synchronized {} daily fund prices for {}", quotes.size(), asset.getTicker());
             }
         } catch (RuntimeException exception) {
             logger.warn("Fund price synchronization failed. Existing prices are kept.", exception);
