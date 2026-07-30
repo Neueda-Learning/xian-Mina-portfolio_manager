@@ -14,15 +14,24 @@ import java.util.List;
 public class PortfolioController {
     private final PortfolioService portfolioService;
 
+    /**
+     * Creates the controller with the portfolio service dependency.
+     */
     public PortfolioController(PortfolioService portfolioService) {
         this.portfolioService = portfolioService;
     }
 
+    /**
+     * Returns all available portfolios.
+     */
     @GetMapping
     public List<Portfolio> getPortfolios() {
         return portfolioService.getAllPortfolios();
     }
 
+    /**
+     * Creates a new portfolio and returns it with HTTP 201.
+     */
     @PostMapping
     public ResponseEntity<Portfolio> createPortfolio(@RequestBody CreatePortfolioRequest request) {
         Portfolio portfolio = portfolioService.createPortfolio(request.getPortfolioName());
