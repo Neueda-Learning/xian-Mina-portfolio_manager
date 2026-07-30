@@ -55,15 +55,21 @@ CREATE TABLE IF NOT EXISTS portfolio_value_history (
     UNIQUE KEY uk_portfolio_value_time (record_time)
 );
 
--- 股票由培训价格 API 同步；BTC、ETH 由 CoinGecko 同步。SQL 不写假价格。
+-- 股票由培训价格 API 同步；Crypto 由 CoinGecko、基金由 Twelve Data 同步。SQL 不写假价格。
 INSERT INTO asset_catalog (ticker, asset_name, asset_type) VALUES
     ('AAPL', 'Apple Inc.', 'STOCK'),
     ('TSLA', 'Tesla Inc.', 'STOCK'),
     ('AMZN', 'Amazon.com Inc.', 'STOCK'),
     ('C', 'Citigroup Inc.', 'STOCK'),
     ('FB', 'Meta Platforms Inc.', 'STOCK'),
-    ('CASH', 'Cash', 'CASH')
+    ('CASH', 'Cash', 'CASH'),
     ('BTC', 'Bitcoin', 'CRYPTO'),
     ('ETH', 'Ethereum', 'CRYPTO'),
-    ('FXAIX', 'Fidelity 500 Index Fund', 'FUND')
+    ('SOL', 'Solana', 'CRYPTO'),
+    ('DOGE', 'Dogecoin', 'CRYPTO'),
+    ('ADA', 'Cardano', 'CRYPTO'),
+    ('FXAIX', 'Fidelity 500 Index Fund', 'FUND'),
+    ('VFIAX', 'Vanguard 500 Index Fund Admiral Shares', 'FUND'),
+    ('VTSAX', 'Vanguard Total Stock Market Index Fund Admiral Shares', 'FUND'),
+    ('SWPPX', 'Schwab S&P 500 Index Fund', 'FUND')
 ON DUPLICATE KEY UPDATE asset_name = VALUES(asset_name), asset_type = VALUES(asset_type);

@@ -25,7 +25,10 @@ public class MarketPriceService {
     private static final Logger logger = LoggerFactory.getLogger(MarketPriceService.class);
     private static final Map<String, String> COIN_GECKO_IDS = Map.of(
             "BTC", "bitcoin",
-            "ETH", "ethereum"
+            "ETH", "ethereum",
+            "SOL", "solana",
+            "DOGE", "dogecoin",
+            "ADA", "cardano"
     );
 
     private final AssetCatalogRepository assetCatalogRepository;
@@ -59,7 +62,7 @@ public class MarketPriceService {
     }
 
     /** 首次启动立刻拉取价格，保证页面打开时已经有市场数据。 */
-    @PostConstruct
+    //@PostConstruct
     public void loadPricesOnStartup() {
         refreshMarketPrices();
     }
@@ -84,7 +87,7 @@ public class MarketPriceService {
         refreshCryptoPrices();
         refreshFundPrices();
         // 全部最新行情写入后，用同一个市场时间保存一次组合总市值。
-        performanceService.recordCurrentPortfolioValue();
+        performanceService.recordAllPortfoliosValue();
         return getMarketAssets();
     }
 
@@ -118,23 +121,23 @@ public class MarketPriceService {
         }
     }
 
-    /**
-     * 基金同步的是每日公布的净值，因此只在项目启动、手动刷新和每日定时刷新时执行。
-     * 与每五分钟同步一次的加密货币任务分开，避免浪费 Twelve Data 的请求额度。
-     */
+    /** 基金净值每天更新；启动、手动刷新和每天 8 点的任务都会同步一次。 */
     private void refreshFundPrices() {
         if (!twelveDataApiClient.isConfigured()) {
             logger.warn("TWELVE_DATA_API_KEY is not configured. Fund prices are skipped.");
             return;
         }
 
-        try {
-            for (AssetCatalog asset : assetCatalogRepository.findAllFunds()) {
+        assetCatalogRepository.ensureFundAssets();
+        for (AssetCatalog asset : assetCatalogRepository.findAllFunds()) {
+            try {
+                // 单只基金失败不影响其他基金的行情刷新。
                 MarketQuote quote = twelveDataApiClient.getLatestFundQuote(asset.getTicker());
                 priceHistoryRepository.savePrices(asset.getId(), List.of(quote));
+            } catch (RuntimeException exception) {
+                logger.warn("Fund price synchronization failed for {}. Existing prices are kept.",
+                        asset.getTicker(), exception);
             }
-        } catch (RuntimeException exception) {
-            logger.warn("Fund price synchronization failed. Existing prices are kept.", exception);
         }
     }
 }

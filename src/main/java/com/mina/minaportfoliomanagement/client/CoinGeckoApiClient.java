@@ -20,11 +20,12 @@ import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.Map;
 
-/** 调用 CoinGecko Demo API，读取 BTC、ETH 的最新美元价格。 */
+/** 调用 CoinGecko Demo API，批量读取加密货币的最新美元价格。 */
 @Component
 public class CoinGeckoApiClient {
 
-    private static final String PRICE_PATH = "/simple/price?ids=bitcoin,ethereum"
+    // CoinGecko 的 simple/price 支持在一次请求中传入多个 coin id。
+    private static final String PRICE_PATH = "/simple/price?ids=bitcoin,ethereum,solana,dogecoin,cardano"
             + "&vs_currencies=usd&include_last_updated_at=true";
     private static final ZoneId APPLICATION_ZONE = ZoneId.of("Asia/Shanghai");
 
@@ -46,7 +47,7 @@ public class CoinGeckoApiClient {
         return apiKey != null && !apiKey.isBlank();
     }
 
-    /** 一次请求同时获取 bitcoin 和 ethereum，避免浪费免费 API 调用额度。 */
+    /** 一次请求同时获取所有配置的加密货币，避免浪费 API 调用额度。 */
     public Map<String, MarketQuote> getLatestPrices() {
         if (!isConfigured()) {
             throw new IllegalStateException("COINGECKO_API_KEY is not configured");
@@ -80,6 +81,9 @@ public class CoinGeckoApiClient {
             Map<String, MarketQuote> prices = new HashMap<>();
             addQuote(root, "bitcoin", prices);
             addQuote(root, "ethereum", prices);
+            addQuote(root, "solana", prices);
+            addQuote(root, "dogecoin", prices);
+            addQuote(root, "cardano", prices);
             return prices;
         } catch (IOException exception) {
             throw new IllegalStateException("CoinGecko API returned invalid JSON", exception);
@@ -91,7 +95,8 @@ public class CoinGeckoApiClient {
         JsonNode priceNode = coin.path("usd");
         JsonNode updatedAtNode = coin.path("last_updated_at");
         if (!priceNode.isNumber() || !updatedAtNode.canConvertToLong()) {
-            throw new IllegalStateException("CoinGecko API did not return a valid price for " + coinId);
+            // 个别币种无报价时跳过，不影响同一次请求里的其他币种。
+            return;
         }
 
         BigDecimal price = priceNode.decimalValue().setScale(2, RoundingMode.HALF_UP);

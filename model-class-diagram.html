@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Model Package Class Diagram</title>
+    <style>
+        :root {
+            --bg-1: #0f172a;
+            --bg-2: #1e293b;
+            --accent-1: #2563eb;
+            --accent-2: #06b6d4;
+            --text: #0f172a;
+            --muted: #64748b;
+            --panel: #ffffff;
+            --border: #e2e8f0;
+            --shadow: 0 24px 60px rgba(15, 23, 42, 0.24);
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: "Inter", "Segoe UI", Arial, sans-serif;
+            color: var(--text);
+            background:
+                radial-gradient(circle at 12% 10%, rgba(37, 99, 235, 0.35) 0%, transparent 32%),
+                radial-gradient(circle at 88% 6%, rgba(6, 182, 212, 0.28) 0%, transparent 28%),
+                linear-gradient(155deg, var(--bg-1), var(--bg-2));
+            padding: 28px 16px 36px;
+        }
+
+        .container {
+            max-width: 1280px;
+            margin: 0 auto;
+        }
+
+        .hero {
+            margin-bottom: 16px;
+            color: #e2e8f0;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 10px;
+            border-radius: 999px;
+            border: 1px solid rgba(226, 232, 240, 0.35);
+            background: rgba(148, 163, 184, 0.16);
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 0.4px;
+            text-transform: uppercase;
+        }
+
+        h1 {
+            margin: 10px 0 8px;
+            font-size: clamp(24px, 3vw, 34px);
+            line-height: 1.15;
+        }
+
+        .subtitle {
+            margin: 0;
+            color: #cbd5e1;
+            font-size: 14px;
+        }
+
+        .panel {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        .panel-header {
+            padding: 14px 18px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px 14px;
+            background: linear-gradient(180deg, #f8fafc, #f1f5f9);
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
+        }
+
+        .panel-title {
+            margin: 0;
+            font-size: 14px;
+            font-weight: 700;
+            color: #1e293b;
+        }
+
+        .panel-meta {
+            margin-left: auto;
+            color: var(--muted);
+            font-size: 12px;
+            font-family: Consolas, "Courier New", monospace;
+        }
+
+        .diagram-wrap {
+            padding: 16px;
+            overflow: auto;
+        }
+
+        .mermaid {
+            min-width: 1080px;
+            margin: 0;
+        }
+
+        .note {
+            margin-top: 10px;
+            color: #94a3b8;
+            font-size: 12px;
+        }
+
+        .error {
+            display: none;
+            margin: 12px 16px 16px;
+            padding: 10px 12px;
+            border-radius: 10px;
+            border: 1px solid #fecaca;
+            background: #fff1f2;
+            color: #9f1239;
+            font-size: 13px;
+        }
+
+        @media (max-width: 768px) {
+            body { padding: 16px 10px 24px; }
+            .diagram-wrap { padding: 10px; }
+            .mermaid { min-width: 980px; }
+        }
+    </style>
+</head>
+<body>
+<main class="container">
+    <section class="hero">
+        <span class="badge">Domain Model</span>
+        <h1>Model Package Class Diagram</h1>
+        <p class="subtitle">com.mina.minaportfoliomanagement.model</p>
+    </section>
+
+    <section class="panel">
+        <div class="panel-header">
+            <span class="dot" aria-hidden="true"></span>
+            <p class="panel-title">UML-like Class Diagram</p>
+            <span class="panel-meta">Mermaid v10</span>
+        </div>
+
+        <div class="diagram-wrap">
+<pre class="mermaid">classDiagram
+    direction LR
+
+    class Portfolio {
+        +Long id
+        +String portfolioName
+        +LocalDateTime createdAt
+    }
+
+    class AssetCatalog {
+        +Long id
+        +String ticker
+        +String assetName
+        +String assetType
+    }
+
+    class PortfolioItem {
+        +Long id
+        +Long portfolioId
+        +Long assetCatalogId
+        +BigDecimal quantity
+        +BigDecimal purchasePrice
+        +LocalDateTime purchaseTime
+        +LocalDateTime createdAt
+    }
+
+    class AssetPriceHistory {
+        +Long id
+        +Long assetCatalogId
+        +BigDecimal marketPrice
+        +LocalDateTime priceTime
+    }
+
+    class TradeHistory {
+        +Long assetCatalogId
+        +Long portfolioId
+        +String tradeType
+        +BigDecimal quantity
+        +BigDecimal tradePrice
+        +LocalDateTime tradeTime
+    }
+
+    class PortfolioValueHistory {
+        +Long id
+        +Long portfolioId
+        +BigDecimal totalValue
+        +LocalDateTime recordDate
+    }
+
+    Portfolio "1" --> "many" PortfolioItem : portfolioId
+    AssetCatalog "1" --> "many" PortfolioItem : assetCatalogId
+    AssetCatalog "1" --> "many" AssetPriceHistory : assetCatalogId
+    Portfolio "1" --> "many" TradeHistory : portfolioId
+    AssetCatalog "1" --> "many" TradeHistory : assetCatalogId
+    Portfolio "1" --> "many" PortfolioValueHistory : portfolioId
+</pre>
+            <p class="note">Tip: 如果图没显示，通常是网络拦截了 jsdelivr CDN。</p>
+        </div>
+        <div id="renderError" class="error">Mermaid 加载失败：请检查网络或把 Mermaid 改为本地静态资源。</div>
+    </section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+    (function () {
+        try {
+            mermaid.initialize({
+                startOnLoad: true,
+                securityLevel: "loose",
+                theme: "base",
+                themeVariables: {
+                    fontFamily: "Inter, Segoe UI, Arial, sans-serif",
+                    primaryColor: "#eef2ff",
+                    primaryTextColor: "#0f172a",
+                    primaryBorderColor: "#93c5fd",
+                    secondaryColor: "#f8fafc",
+                    tertiaryColor: "#e2e8f0",
+                    lineColor: "#334155",
+                    clusterBkg: "#f8fafc",
+                    clusterBorder: "#cbd5e1"
+                },
+                class: {
+                    hideEmptyMembersBox: false
+                }
+            });
+        } catch (error) {
+            document.getElementById("renderError").style.display = "block";
+        }
+    })();
+</script>
+</body>
+</html>

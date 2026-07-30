@@ -29,30 +29,32 @@ public class HoldingService {
     private final AssetPriceHistoryRepository priceHistoryRepository;
     private final PerformanceService performanceService;
     private final TradeHistoryRepository tradeHistoryRepository;
+    private final PortfolioService portfolioService;
     private final CashFxService cashFxService;
 
 
-    public HoldingService(PortfolioItemRepository portfolioItemRepository,
-                          AssetCatalogRepository assetCatalogRepository,
-                          AssetPriceHistoryRepository priceHistoryRepository,
-                          PerformanceService performanceService,
-                          TradeHistoryRepository tradeHistoryRepository,
+    public HoldingService(PortfolioItemRepository portfolioItemRepository, AssetCatalogRepository assetCatalogRepository,
+                          AssetPriceHistoryRepository priceHistoryRepository, PerformanceService performanceService,
+                          TradeHistoryRepository tradeHistoryRepository, PortfolioService portfolioService,
                           CashFxService cashFxService) {
         this.portfolioItemRepository = portfolioItemRepository;
         this.assetCatalogRepository = assetCatalogRepository;
         this.priceHistoryRepository = priceHistoryRepository;
         this.performanceService = performanceService;
         this.tradeHistoryRepository = tradeHistoryRepository;
+        this.portfolioService = portfolioService;
         this.cashFxService = cashFxService;
     }
 
-    public List<HoldingView> getAllItems() {
-        List<HoldingView> items = portfolioItemRepository.findAll();
-        performanceService.recordCurrentPortfolioValue();
+    public List<HoldingView> getAllItems(Long portfolioId) {
+        long resolvedPortfolioId = portfolioService.requirePortfolioId(portfolioId);
+        List<HoldingView> items = portfolioItemRepository.findAll(resolvedPortfolioId);
+        performanceService.recordCurrentPortfolioValue(resolvedPortfolioId);
         return items;
     }
-    public HoldingView getItem(long id){
-        return portfolioItemRepository.findById(id)
+
+    public HoldingView getItem(long id, long portfolioId) {
+        return portfolioItemRepository.findById(id, portfolioId)
                 .orElseThrow(() -> new ResponseStatusException
                         (HttpStatus.NOT_FOUND, "Portfolio item not found: " + id)
                 );
@@ -72,6 +74,7 @@ public class HoldingService {
 
     public HoldingView createItem(BuyRequest request){
         validateBuyOrder(request);
+        long portfolioId = portfolioService.requirePortfolioId(request.getPortfolioId());
         assetCatalogRepository.findById(request.getAssetCatalogId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
                         "Selected asset is not available"));
@@ -80,70 +83,74 @@ public class HoldingService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Selected price time is not available"));
 
         PortfolioItem item = new PortfolioItem();
+        item.setPortfolioId(portfolioId);
         item.setAssetCatalogId(request.getAssetCatalogId());
         item.setQuantity(request.getQuantity());
         item.setPurchasePrice(marketQuote.price());
         item.setPurchaseTime(marketQuote.priceTime());
 
         long id;
-        var existingHolding = portfolioItemRepository.findByAssetCatalogId(item.getAssetCatalogId());
+        var existingHolding = portfolioItemRepository.findByAssetCatalogId(portfolioId, item.getAssetCatalogId());
         if (existingHolding.isPresent()) {
             PortfolioItem existing = existingHolding.get();
             BigDecimal totalQuantity = existing.getQuantity().add(item.getQuantity());
             BigDecimal totalCost = existing.getQuantity().multiply(existing.getPurchasePrice())
                     .add(item.getQuantity().multiply(item.getPurchasePrice()));
             BigDecimal averagePrice = totalCost.divide(totalQuantity, 2, RoundingMode.HALF_UP);
-            portfolioItemRepository.updateHolding(existing.getId(), totalQuantity, averagePrice, item.getPurchaseTime());
+            portfolioItemRepository.updateHolding(existing.getId(), portfolioId, totalQuantity, averagePrice, item.getPurchaseTime());
             id = existing.getId();
         } else {
             id = portfolioItemRepository.save(item);
         }
-        tradeHistoryRepository.save(new TradeHistory(item.getAssetCatalogId(), "BUY", item.getQuantity(),
+        tradeHistoryRepository.save(new TradeHistory(item.getAssetCatalogId(), portfolioId, "BUY", item.getQuantity(),
                 marketQuote.price(), marketQuote.priceTime()));
-        HoldingView result = getItem(id);
-        performanceService.recordCurrentPortfolioValue();
+        HoldingView result = getItem(id, portfolioId);
+        performanceService.recordCurrentPortfolioValue(portfolioId);
         return result;
     }
 
     public HoldingView addCash(CashDepositRequest request) {
+        long portfolioId = portfolioService.requirePortfolioId(request.getPortfolioId());
         if (request.getAmount() == null || request.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "amount must be greater than zero");
         }
-        CashFxService.FxQuote fxQuote = cashFxService.getUsdQuote(request.resolveCurrencyCode());
 
+        CashFxService.FxQuote fxQuote = cashFxService.getUsdQuote(request.resolveCurrencyCode());
         var cashAsset = assetCatalogRepository.ensureCashAsset(fxQuote.currencyCode());
         BigDecimal amount = request.getAmount().setScale(4, RoundingMode.HALF_UP);
         LocalDateTime now = LocalDateTime.now();
 
         PortfolioItem item = new PortfolioItem();
+        item.setPortfolioId(portfolioId);
         item.setAssetCatalogId(cashAsset.getId());
         item.setQuantity(amount);
         item.setPurchasePrice(fxQuote.usdRate());
         item.setPurchaseTime(now);
 
         long id;
-        var existingHolding = portfolioItemRepository.findByAssetCatalogId(item.getAssetCatalogId());
+        var existingHolding = portfolioItemRepository.findByAssetCatalogId(portfolioId, item.getAssetCatalogId());
         if (existingHolding.isPresent()) {
             PortfolioItem existing = existingHolding.get();
             BigDecimal totalQuantity = existing.getQuantity().add(item.getQuantity());
             BigDecimal totalUsdCost = existing.getQuantity().multiply(existing.getPurchasePrice())
                     .add(item.getQuantity().multiply(item.getPurchasePrice()));
             BigDecimal averageFxRate = totalUsdCost.divide(totalQuantity, 6, RoundingMode.HALF_UP);
-            portfolioItemRepository.updateHolding(existing.getId(), totalQuantity, averageFxRate, now);
+            portfolioItemRepository.updateHolding(existing.getId(), portfolioId, totalQuantity, averageFxRate, now);
             id = existing.getId();
         } else {
             id = portfolioItemRepository.save(item);
         }
 
-        tradeHistoryRepository.save(new TradeHistory(item.getAssetCatalogId(), "DEPOSIT", item.getQuantity(),
+        tradeHistoryRepository.save(new TradeHistory(item.getAssetCatalogId(), portfolioId, "DEPOSIT", item.getQuantity(),
                 item.getPurchasePrice(), now));
-        HoldingView result = getItem(id);
-        performanceService.recordCurrentPortfolioValue();
+        HoldingView result = getItem(id, portfolioId);
+        performanceService.recordCurrentPortfolioValue(portfolioId);
         return result;
     }
 
-    public void sellItem(long id, SellRequest request) {
-        HoldingView holding = getItem(id);
+    public void sellItem(long id, Long portfolioId, SellRequest request) {
+        long resolvedPortfolioId = portfolioService.requirePortfolioId(portfolioId);
+        HoldingView holding = getItem(id, resolvedPortfolioId);
         if (request.getQuantity() == null || request.getQuantity().compareTo(BigDecimal.ZERO) <= 0) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "sell quantity must be greater than zero");
         }
@@ -154,13 +161,21 @@ public class HoldingService {
         SellQuote sellQuote = resolveSellQuote(holding);
         BigDecimal remaining = holding.getQuantity().subtract(request.getQuantity());
         if (remaining.compareTo(BigDecimal.ZERO) == 0) {
-            portfolioItemRepository.deleteById(id);
+            portfolioItemRepository.deleteById(id, resolvedPortfolioId);
         } else {
-            portfolioItemRepository.updateQuantity(id, remaining);
+            portfolioItemRepository.updateQuantity(id, resolvedPortfolioId, remaining);
         }
-        tradeHistoryRepository.save(new TradeHistory(holding.getAssetCatalogId(), "SELL", request.getQuantity(),
-                sellQuote.price(), sellQuote.time()));
-        performanceService.recordCurrentPortfolioValue();
+        tradeHistoryRepository.save(new TradeHistory(holding.getAssetCatalogId(), resolvedPortfolioId, "SELL",
+                request.getQuantity(), sellQuote.price(), sellQuote.time()));
+        performanceService.recordCurrentPortfolioValue(resolvedPortfolioId);
+    }
+
+    public void deleteItem(long id, Long portfolioId) {
+        long resolvedPortfolioId = portfolioService.requirePortfolioId(portfolioId);
+        HoldingView holding = getItem(id, resolvedPortfolioId);
+        SellRequest request = new SellRequest();
+        request.setQuantity(holding.getQuantity());
+        sellItem(id, resolvedPortfolioId, request);
     }
 
     private SellQuote resolveSellQuote(HoldingView holding) {
@@ -176,12 +191,7 @@ public class HoldingService {
         return "CASH".equalsIgnoreCase(holding.getAssetType());
     }
 
-    public void deleteItem(long id) {
-        HoldingView holding = getItem(id);
-        SellRequest request = new SellRequest();
-        request.setQuantity(holding.getQuantity());
-        sellItem(id, request);
-    }
+
 
 
 }

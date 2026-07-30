@@ -82,8 +82,12 @@ public class TwelveDataApiClient {
     private MarketQuote parseQuote(String responseBody, String ticker) {
         try {
             JsonNode root = objectMapper.readTree(responseBody);
-            if (root.has("code") || root.has("status")) {
-                throw new IllegalStateException("Twelve Data API did not return a valid quote for " + ticker);
+            String status = root.path("status").asText();
+            // Twelve Data 的成功响应可能包含 status: ok，不能把它误判为失败。
+            if (root.has("code") || (!status.isBlank() && !"ok".equalsIgnoreCase(status))) {
+                String message = root.path("message").asText("unknown API error");
+                throw new IllegalStateException("Twelve Data API did not return a valid quote for "
+                        + ticker + ": " + message);
             }
 
             JsonNode closeNode = root.path("close");

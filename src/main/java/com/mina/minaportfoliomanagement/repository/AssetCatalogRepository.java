@@ -75,21 +75,28 @@ public class AssetCatalogRepository {
         ));
     }
 
-    /** 为已运行过的旧数据库补充 BTC、ETH，不要求用户手工清库。 */
+    /** 为已运行过的旧数据库补充 CoinGecko 支持的加密货币，不要求用户手工清库。 */
     public void ensureCryptoAssets() {
         String sql = "INSERT INTO asset_catalog (ticker, asset_name, asset_type) VALUES "
-                + "('BTC', 'Bitcoin', 'CRYPTO'), ('ETH', 'Ethereum', 'CRYPTO') "
+                + "('BTC', 'Bitcoin', 'CRYPTO'), "
+                + "('ETH', 'Ethereum', 'CRYPTO'), "
+                + "('SOL', 'Solana', 'CRYPTO'), "
+                + "('DOGE', 'Dogecoin', 'CRYPTO'), "
+                + "('ADA', 'Cardano', 'CRYPTO') "
                 + "ON DUPLICATE KEY UPDATE asset_name = VALUES(asset_name), asset_type = VALUES(asset_type)";
         jdbcTemplate.update(sql);
     }
 
     /**
-     * 为已运行过的旧数据库补充已验证的基金资产。
+     * 为已运行过的旧数据库补充常见指数基金。
      * ON DUPLICATE KEY 保证项目每次启动都不会插入重复数据。
      */
     public void ensureFundAssets() {
         String sql = "INSERT INTO asset_catalog (ticker, asset_name, asset_type) VALUES "
-                + "('FXAIX', 'Fidelity 500 Index Fund', 'FUND') "
+                + "('FXAIX', 'Fidelity 500 Index Fund', 'FUND'), "
+                + "('VFIAX', 'Vanguard 500 Index Fund Admiral Shares', 'FUND'), "
+                + "('VTSAX', 'Vanguard Total Stock Market Index Fund Admiral Shares', 'FUND'), "
+                + "('SWPPX', 'Schwab S&P 500 Index Fund', 'FUND') "
                 + "ON DUPLICATE KEY UPDATE asset_name = VALUES(asset_name), asset_type = VALUES(asset_type)";
         jdbcTemplate.update(sql);
     }

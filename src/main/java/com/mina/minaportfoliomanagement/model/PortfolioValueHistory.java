@@ -6,14 +6,16 @@ import java.time.LocalDateTime;
 
 public class PortfolioValueHistory {
     private Long id;
+    private Long portfolioId;
     private BigDecimal totalValue;
     private LocalDateTime recordDate;
 
     public PortfolioValueHistory() {
     }
 
-    public PortfolioValueHistory(Long id, BigDecimal totalValue, LocalDateTime recordDate) {
+    public PortfolioValueHistory(Long id, Long portfolioId, BigDecimal totalValue, LocalDateTime recordDate) {
         this.id = id;
+        this.portfolioId = portfolioId;
         this.totalValue = totalValue;
         this.recordDate = recordDate;
     }
@@ -24,6 +26,14 @@ public class PortfolioValueHistory {
 
     public void setId(Long id) {
         this.id = id;
+    }
+
+    public Long getPortfolioId() {
+        return portfolioId;
+    }
+
+    public void setPortfolioId(Long portfolioId) {
+        this.portfolioId = portfolioId;
     }
 
     public BigDecimal getTotalValue() {
