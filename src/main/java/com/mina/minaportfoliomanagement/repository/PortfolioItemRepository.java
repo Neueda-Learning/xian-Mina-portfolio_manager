@@ -19,7 +19,7 @@ public class PortfolioItemRepository {
     }
 
     private String selectHoldingSql() {
-        //子查询取该资产最新的市场价格。
+        // Subquery to get the latest market price for the asset.
         return "SELECT p.id, p.portfolio_id, p.asset_catalog_id, a.ticker, a.asset_name, a.asset_type, p.quantity, p.purchase_price, p.created_at, "
                 + "COALESCE(latest_price.market_price, p.purchase_price) AS market_price FROM portfolio_item p JOIN asset_catalog a ON a.id = p.asset_catalog_id "
                 + "LEFT JOIN asset_price_history latest_price ON latest_price.id = ("
@@ -75,7 +75,7 @@ public class PortfolioItemRepository {
 
     public long save(PortfolioItem item) {
         String sql = "INSERT INTO portfolio_item (portfolio_id, asset_catalog_id, quantity, purchase_price, purchase_time) VALUES (?, ?, ?, ?, ?)";
-        // KeyHolder 可以取得本次买入的持仓 id；买入价格来自当天市场价格。
+        // KeyHolder retrieves the holding id for this purchase; the purchase price is derived from the market price on the day of purchase.
         org.springframework.jdbc.support.GeneratedKeyHolder keyHolder = new org.springframework.jdbc.support.GeneratedKeyHolder();
         jdbcTemplate.update(connection -> {
             java.sql.PreparedStatement ps = connection.prepareStatement(sql, new String[]{"id"});
@@ -98,6 +98,7 @@ public class PortfolioItemRepository {
         return jdbcTemplate.update("UPDATE portfolio_item SET quantity = ? WHERE id = ? AND portfolio_id = ?", remainingQuantity, id, portfolioId);
     }
 
+    // Updates an existing holding after an additional buy: quantity, weighted average purchase price, and latest purchase time.
     public int updateHolding(long id, long portfolioId, BigDecimal quantity, BigDecimal averagePurchasePrice,
                              java.time.LocalDateTime latestPurchaseTime) {
         String sql = "UPDATE portfolio_item SET quantity = ?, purchase_price = ?, purchase_time = ? WHERE id = ? AND portfolio_id = ?";
