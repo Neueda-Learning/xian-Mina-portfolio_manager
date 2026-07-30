@@ -32,7 +32,10 @@ public class HoldingService {
     private final PortfolioService portfolioService;
     private final CashFxService cashFxService;
 
-
+    /**
+     * Creates the holding service with all repositories and domain services required
+     * for buy, sell, and cash deposit workflows.
+     */
     public HoldingService(PortfolioItemRepository portfolioItemRepository, AssetCatalogRepository assetCatalogRepository,
                           AssetPriceHistoryRepository priceHistoryRepository, PerformanceService performanceService,
                           TradeHistoryRepository tradeHistoryRepository, PortfolioService portfolioService,
@@ -46,6 +49,10 @@ public class HoldingService {
         this.cashFxService = cashFxService;
     }
 
+    /**
+     * Returns all holdings for the requested portfolio and records a latest portfolio
+     * valuation snapshot.
+     */
     public List<HoldingView> getAllItems(Long portfolioId) {
         long resolvedPortfolioId = portfolioService.requirePortfolioId(portfolioId);
         List<HoldingView> items = portfolioItemRepository.findAll(resolvedPortfolioId);
@@ -53,6 +60,10 @@ public class HoldingService {
         return items;
     }
 
+    /**
+     * Returns a single holding by id within the given portfolio.
+     * Throws 404 when the holding does not exist.
+     */
     public HoldingView getItem(long id, long portfolioId) {
         return portfolioItemRepository.findById(id, portfolioId)
                 .orElseThrow(() -> new ResponseStatusException
@@ -60,6 +71,9 @@ public class HoldingService {
                 );
     }
 
+    /**
+     * Validates buy order inputs before market quote lookup and persistence.
+     */
     private void validateBuyOrder(BuyRequest request) {
         if (request.getAssetCatalogId() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "assetCatalogId is required");
@@ -72,6 +86,10 @@ public class HoldingService {
         }
     }
 
+    /**
+     * Creates a new holding from a buy request, or merges into an existing holding
+     * by recalculating weighted average purchase price.
+     */
     public HoldingView createItem(BuyRequest request){
         validateBuyOrder(request);
         long portfolioId = portfolioService.requirePortfolioId(request.getPortfolioId());
@@ -109,6 +127,10 @@ public class HoldingService {
         return result;
     }
 
+    /**
+     * Deposits cash in a selected currency into the portfolio. Existing cash holdings
+     * are merged using a weighted average FX rate in USD terms.
+     */
     public HoldingView addCash(CashDepositRequest request) {
         long portfolioId = portfolioService.requirePortfolioId(request.getPortfolioId());
         if (request.getAmount() == null || request.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
@@ -148,6 +170,9 @@ public class HoldingService {
         return result;
     }
 
+    /**
+     * Sells part or all of a holding and records the trade with the resolved sell quote.
+     */
     public void sellItem(long id, Long portfolioId, SellRequest request) {
         long resolvedPortfolioId = portfolioService.requirePortfolioId(portfolioId);
         HoldingView holding = getItem(id, resolvedPortfolioId);
@@ -170,6 +195,9 @@ public class HoldingService {
         performanceService.recordCurrentPortfolioValue(resolvedPortfolioId);
     }
 
+    /**
+     * Removes a holding by selling its full remaining quantity.
+     */
     public void deleteItem(long id, Long portfolioId) {
         long resolvedPortfolioId = portfolioService.requirePortfolioId(portfolioId);
         HoldingView holding = getItem(id, resolvedPortfolioId);
@@ -178,6 +206,10 @@ public class HoldingService {
         sellItem(id, resolvedPortfolioId, request);
     }
 
+    /**
+     * Resolves the price and time to use for a sell trade.
+     * Cash holdings use their stored purchase price; other assets use latest market price.
+     */
     private SellQuote resolveSellQuote(HoldingView holding) {
         if (isCashHolding(holding)) {
             return new SellQuote(holding.getPurchasePrice(), LocalDateTime.now());
@@ -187,6 +219,9 @@ public class HoldingService {
         return new SellQuote(marketAsset.getMarketPrice(), marketAsset.getPriceTime());
     }
 
+    /**
+     * Returns true when the holding is a cash asset.
+     */
     private boolean isCashHolding(HoldingView holding) {
         return "CASH".equalsIgnoreCase(holding.getAssetType());
     }

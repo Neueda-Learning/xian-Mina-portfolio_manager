@@ -36,7 +36,9 @@ public class PortfolioService {
         }
     }
 
-    /** 未传组合 id 时，兼容旧接口，默认使用 My Portfolio。 */
+    /**
+     * For backward compatibility, use My Portfolio by default when portfolio id is not provided.
+     */
     public long requirePortfolioId(Long portfolioId) {
         long id = portfolioId == null ? PortfolioRepository.DEFAULT_PORTFOLIO_ID : portfolioId;
         portfolioRepository.findById(id).orElseThrow(() -> new ResponseStatusException(
